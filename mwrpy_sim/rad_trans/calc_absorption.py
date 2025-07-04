@@ -1,3 +1,11 @@
+"""
+This class contains the absorption models used in mwrpy_sim. Adapted from:
+Rosenkranz, P.W.: Line-by-line microwave radiative transfer (non-scattering)
+[2022] (version 2022/08/25),
+[2024] (version 2024/07/03),
+http://cetemps.aquila.infn.it/mwrnet/lblmrt_ns.html
+"""
+
 import os
 
 import numpy as np
@@ -179,6 +187,7 @@ def ABWV_R24(
 
 
 def H2OCON(F, T):
+    """Compute the self-continuum absorption of water vapor."""
     NF = 6
     SELFCON = [2.877e-21, 2.855e-21, 2.731e-21, 2.49e-21, 2.178e-21, 1.863e-21]
     SELFTEXP = [6.413, 6.414, 6.275, 6.049, 5.789, 5.557]
@@ -244,7 +253,7 @@ def ABO2_R22(TEMP, PRES, VAPDEN, FREQ):
 
     ALPHA = 1.6097e11 * SUM * PRESDA * TH**3.0
 
-    return np.maximum(ALPHA, 0.0) * 1.004  # increase absorption to match Koshelev2017
+    return np.maximum(ALPHA, 0.0) * 1.004
 
 
 def ABO2_R24(TEMP, PRES, VAPDEN, FREQ):

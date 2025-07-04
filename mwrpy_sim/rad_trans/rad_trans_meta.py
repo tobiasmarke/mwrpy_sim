@@ -89,6 +89,11 @@ ATTRIBUTES_SOURCE = {
         standard_name="brightness_temperature",
         units="K",
     ),
+    "tb_clr": MetaData(
+        long_name="Microwave brightness temperature (no liquid water) simulated from ",
+        standard_name="brightness_temperature",
+        units="K",
+    ),
     "air_temperature": MetaData(
         long_name="Temperature profile interpolated from ",
         standard_name="air_temperature",
