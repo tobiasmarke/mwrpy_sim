@@ -1,3 +1,8 @@
+## 0.7.6 – 2025-07-04
+
+- Add "clear-sky" TB variable and update documentation / references
+- Update workflow
+
 ## 0.7.5 – 2025-06-13
 
 - Rebrand to mwrpy_sim

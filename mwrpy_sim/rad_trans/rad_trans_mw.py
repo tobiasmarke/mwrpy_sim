@@ -150,9 +150,29 @@ def calc_mw_rt(
     return TB
 
 
-def TAU_CALC(z, T, p, rhow, LWC, f, config, theta):
+def TAU_CALC(
+    z: np.ndarray,
+    T: np.ndarray,
+    p: np.ndarray,
+    rhow: np.ndarray,
+    LWC: np.ndarray,
+    f: float,
+    config: dict,
+    theta: float,
+) -> np.ndarray:
     """
     Calculate optical thickness tau.
+    Args:
+        z: Height profile (km above observation height).
+        T: Temperature profile (K).
+        p: Pressure profile (hPa).
+        rhow: Water vapor density profile (g/m^3).
+        LWC: Liquid water content profile (g/m^3).
+        f: Frequency in GHz.
+        config: Configuration dictionary.
+        theta: Zenith angle of observation in degrees.
+    Returns:
+        tau: Optical thickness profile (tau).
     """
     model = config["model"]
     abs_wv = np.array(
@@ -205,12 +225,12 @@ def refractivity_Rueeger2002(p: np.ndarray, t: np.ndarray, e: np.ndarray) -> np.
     These equations were intended for frequencies under 20 GHz
 
     Args:
-        p (numpy.ndarray): Pressure profile (hPa).
-        t (numpy.ndarray): Temperature profile (K).
-        e (numpy.ndarray): Vapor pressure profile (hPa).
+        p: Pressure profile (hPa).
+        t: Temperature profile (K).
+        e: Vapor pressure profile (hPa).
 
     Returns:
-        refindx (numpy.ndarray): Refractive index profile
+        refindx: Refractive index profile
     """
     coeff = [77.695, 71.97, 3.75406]
     N = (
@@ -226,18 +246,23 @@ def refractivity_Rueeger2002(p: np.ndarray, t: np.ndarray, e: np.ndarray) -> np.
 
 
 def refractivity_Thayer1974(p: np.ndarray, t: np.ndarray, e: np.ndarray) -> np.ndarray:
-    """Computes profile of refractive index. Adapted from pyrtlib.
+    """Computes profile of refractive index.
+
+    Adapted from pyrtlib:
+    Larosa, S., Cimini, D., Gallucci, D., Nilo, S. T., & Romano, F. (2024).
+    PyRTlib: a python package for non-scattering line-by-line microwave Radiative
+    Transfer simulations. https://doi.org/10.5281/zenodo.8219145
     Refractivity equations were taken from [Thayer-1974]_.
 
     These equations were intended for frequencies under 20 GHz
 
     Args:
-        p (numpy.ndarray): Pressure profile (hPa).
-        t (numpy.ndarray): Temperature profile (K).
-        e (numpy.ndarray): Vapor pressure profile (hPa).
+        p: Pressure profile (hPa).
+        t: Temperature profile (K).
+        e: Vapor pressure profile (hPa).
 
     Returns:
-        refindx (numpy.ndarray): Refractive index profile
+        refindx: Refractive index profile
     """
     pa = p - e
     tc = t - 273.16
@@ -262,18 +287,23 @@ def refractivity_Thayer1974(p: np.ndarray, t: np.ndarray, e: np.ndarray) -> np.n
 def ray_tracing(
     z: np.ndarray, refindx: np.ndarray, angle: float, z0: float
 ) -> np.ndarray:
-    """Ray-tracing algorithm of Dutton, Thayer, and Westwater, adapted from pyrtlib.
+    """Ray-tracing algorithm of Dutton, Thayer, and Westwater.
+
+    Adapted from pyrtlib:
+    Larosa, S., Cimini, D., Gallucci, D., Nilo, S. T., & Romano, F. (2024).
+    PyRTlib: a python package for non-scattering line-by-line microwave Radiative
+    Transfer simulations. https://doi.org/10.5281/zenodo.8219145
 
     Args:
-        z (numpy.ndarray): Height profile (km above observation height, z0).
-        refindx (numpy.ndarray): Refractive index profile.
-        angle (float): Elevation angle (degrees).
-        z0 (float): Observation height (km msl).
+        z: Height profile (km above observation height, z0).
+        refindx: Refractive index profile.
+        angle: Elevation angle (degrees).
+        z0: Observation height (km msl).
 
     Returns:
-        numpy.ndarray: Array containing slant path length profiles (km)
+        ds: Array containing slant path length profiles (km)
 
-    .. note::
+    note::
         The algorithm assumes that x decays exponentially over each layer.
     """
 
@@ -344,8 +374,19 @@ def ray_tracing(
 
 
 def TB_CALC(frq: np.ndarray, t: np.ndarray, taulay: np.ndarray) -> np.ndarray:
-    """calculate brightness temperatures without scattering
-    adapted from pyrtlib
+    """Calculate brightness temperatures without scattering.
+
+    Adapted from pyrtlib:
+    Larosa, S., Cimini, D., Gallucci, D., Nilo, S. T., & Romano, F. (2024).
+    PyRTlib: a python package for non-scattering line-by-line microwave Radiative
+    Transfer simulations. https://doi.org/10.5281/zenodo.8219145
+
+    Args:
+        frq (numpy.ndarray): Frequency vector in GHz.
+        t (numpy.ndarray): Temperature profile in K.
+        taulay (numpy.ndarray): Optical thickness profile.
+    Returns:
+        numpy.ndarray: Brightness temperatures in K.
     """
 
     hvk = np.dot(frq * 1e9, con.h) / con.kB

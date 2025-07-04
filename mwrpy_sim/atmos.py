@@ -19,24 +19,32 @@ def abs_hum(T: np.ndarray, rh: np.ndarray) -> np.ndarray:
 
 
 def calc_rho(T: np.ndarray, rh: np.ndarray):
+    """Density of moist air (g/m^3) from temperature and relative humidity.
+    Input:
+        T: Temperature (K).
+        rh: Relative humidity (0-1).
+    Output:
+        Density of moist air (g/m^3).
+    """
     es = calc_saturation_vapor_pressure(T) / 100.0
 
-    return es * rh / 1000.0
+    return es * rh
 
 
 def calc_saturation_vapor_pressure(temperature: np.ndarray) -> np.ndarray:
-    """saturation vapor pressure (Pa) over water adapted from pyrtlib.
-    Args:
+    """Calculate saturation vapor pressure (Pa) over water.
+    Source: Smithsonian Tables 1984, after Goff and Gratch 1946
+    Input:
         temperature: Temperature (K).
-    Returns:
+    Output:
         Saturation vapor pressure (Pa).
     """
-    y = 373.16 / temperature
+    t = 373.16 / temperature
     es = (
-        np.dot(-7.90298, (y - 1.0))
-        + np.dot(5.02808, np.log10(y))
-        - np.dot(1.3816e-07, (10 ** (np.dot(11.344, (1.0 - (1.0 / y)))) - 1.0))
-        + np.dot(0.0081328, (10 ** (np.dot(-3.49149, (y - 1.0))) - 1.0))
+        -7.90298 * (t - 1.0)
+        + 5.02808 * np.log10(t)
+        - 1.3816e-07 * (10 ** (11.344 * (1.0 - (1.0 / t))) - 1.0)
+        + 0.0081328 * (10 ** (-3.49149 * (t - 1.0)) - 1.0)
         + np.log10(1013.246)
     )
 
@@ -46,14 +54,13 @@ def calc_saturation_vapor_pressure(temperature: np.ndarray) -> np.ndarray:
 def q2rh(q, T, p):
     """
     Calculate relative humidity from specific humidity
-
     Input:
-    T is in K
-    p is in Pa
-    q in kg/kg
-
+        q is specific humidity [kg/kg]
+        T is temperature [K]
+        p is pressure [Pa]
     Output:
-    rh is in Pa/Pa
+        rh is relative humidity [0-1]
+
     """
 
     esat = calc_saturation_vapor_pressure(T)
@@ -67,13 +74,13 @@ def q2rh(q, T, p):
 
 def moist_rho_rh(p, T, rh):
     """
+    Density of moist air from pressure, temperature and relative humidity.
     Input:
-    p is in Pa
-    T is in K
-    rh is in Pa/Pa
-
+        p is in Pa
+        T is in K
+        rh is in Pa/Pa
     Output:
-    density of moist air [kg/m^3]
+        density of moist air [kg/m^3]
     """
 
     eStar = calc_saturation_vapor_pressure(T)
@@ -85,14 +92,12 @@ def moist_rho_rh(p, T, rh):
 
 def hum_to_iwv(ahum, height):
     """
-    Calculate the integrated water vapour
-
+    Calculate the integrated water vapour.
     Input:
-    ahum is in kg/m^3
-    height is in m
-
-    Output
-    iwv in kg/m^2
+        ahum is in kg/m^3
+        height is in m
+    Output:
+        iwv in kg/m^2
     """
 
     iwv = np.sum((ahum[1:] + ahum[:-1]) / 2.0 * np.diff(height))
@@ -100,19 +105,54 @@ def hum_to_iwv(ahum, height):
     return iwv
 
 
+def detect_cloud_mod(z, lwc):
+    """
+    Detect liquid cloud boundaries from model.
+    Input:
+        z: height grid
+        lwc: liquid water content on z
+    Output:
+        z_top: array of cloud tops
+        z_base: array of cloud bases
+    """
+    i_cloud, i_top, i_base = (
+        np.where(lwc > 0.0)[0],
+        np.empty(0, np.int32),
+        np.empty(0, np.int32),
+    )
+    if len(i_cloud) > 1:
+        i_base = np.unique(
+            np.hstack((i_cloud[0], i_cloud[np.diff(np.hstack((0, i_cloud))) > 1]))
+        )
+        i_top = np.hstack(
+            (i_cloud[np.diff(np.hstack((i_cloud, i_cloud[-1]))) > 1], i_cloud[-1])
+        )
+
+        if len(i_top) != len(i_base):
+            print("something wrong, number of bases NE number of cloud tops!")
+            return [], []
+
+    return z[i_top], z[i_base]
+
+
 def detect_liq_cloud(z, t, rh, p_rs):
     """
-    # INPUT
-    # z: height grid
-    # T: temperature on z
-    # rh: relative humidty on z
-    # rh_thres: relative humidity threshold for the detection on liquid clouds on z
-    # T_thres: do not detect liquid water clouds below this value (scalar)
-    # ***********
-    # OUTPUT
-    # z_top: array of cloud tops
-    # z_base: array of cloud bases
-    # z_cloud: array of cloudy height levels
+    Detect liquid water cloud boundaries from relative humidity and temperature.
+    Adapted from PAMTRA:
+    Mech, M., Maahn, M., Kneifel, S., Ori, D., Orlandi, E., Kollias, P., Schemann, V.,
+    and Crewell, S.: PAMTRA 1.0: the Passive and Active Microwave radiative TRAnsfer
+    tool for simulating radiometer and radar measurements of the cloudy atmosphere,
+    Geosci. Model Dev., 13, 4229–4251, https://doi.org/10.5194/gmd-13-4229-2020, 2020
+
+    Input:
+        z: height grid
+        T: temperature on z
+        rh: relative humidty on z
+        rh_thres: relative humidity threshold for the detection on liquid clouds on z
+        T_thres: do not detect liquid water clouds below this value (scalar)
+    Output:
+        z_top: array of cloud tops
+        z_base: array of cloud bases
     """
 
     alpha = 0.59
@@ -144,40 +184,25 @@ def detect_liq_cloud(z, t, rh, p_rs):
     return z[i_top], z[i_base]
 
 
-def detect_cloud_mod(z, lwc):
-    """detect liquid cloud boundaries from model"""
-    i_cloud, i_top, i_base = (
-        np.where(lwc > 0.0)[0],
-        np.empty(0, np.int32),
-        np.empty(0, np.int32),
-    )
-    if len(i_cloud) > 1:
-        i_base = np.unique(
-            np.hstack((i_cloud[0], i_cloud[np.diff(np.hstack((0, i_cloud))) > 1]))
-        )
-        i_top = np.hstack(
-            (i_cloud[np.diff(np.hstack((i_cloud, i_cloud[-1]))) > 1], i_cloud[-1])
-        )
-
-        if len(i_top) != len(i_base):
-            print("something wrong, number of bases NE number of cloud tops!")
-            return [], []
-
-    return z[i_top], z[i_base]
-
-
 def adiab(i, T, P, z):
     """
     Adiabatic liquid water content assuming pseudo-adiabatic lapse rate
     throughout the whole cloud layer. Thus, the assumed temperature
-    profile is different from the measured one
+    profile is different from the measured one.
+
+    Adapted from PAMTRA:
+    Mech, M., Maahn, M., Kneifel, S., Ori, D., Orlandi, E., Kollias, P., Schemann, V.,
+    and Crewell, S.: PAMTRA 1.0: the Passive and Active Microwave radiative TRAnsfer
+    tool for simulating radiometer and radar measurements of the cloudy atmosphere,
+    Geosci. Model Dev., 13, 4229–4251, https://doi.org/10.5194/gmd-13-4229-2020, 2020
+
     Input:
-    i no of levels
-    T is in K
-    p is in Pa
-    z is in m
+        i no of levels
+        T is in K
+        p is in Pa
+        z is in m
     Output:
-    LWC
+        LWC is in kg/m^3
     """
 
     #   Set actual cloud base temperature to the measured one
@@ -230,10 +255,19 @@ def adiab(i, T, P, z):
 
 def mod_ad(T_cloud, p_cloud, z_cloud):
     """
-    :param T_cloud: Temperature [K]
-    :param p_cloud: Pressure [Pa]
-    :param z_cloud: Height [m]
-    :return: LWC, cloud_new
+    Adapted from PAMTRA:
+    Mech, M., Maahn, M., Kneifel, S., Ori, D., Orlandi, E., Kollias, P., Schemann, V.,
+    and Crewell, S.: PAMTRA 1.0: the Passive and Active Microwave radiative TRAnsfer
+    tool for simulating radiometer and radar measurements of the cloudy atmosphere,
+    Geosci. Model Dev., 13, 4229–4251, https://doi.org/10.5194/gmd-13-4229-2020, 2020
+
+    Input:
+        T_cloud: Temperature [K]
+        p_cloud: Pressure [Pa]
+        z_cloud: Height [m]
+    Output:
+        lwc: Liquid water content [kg/m^3]
+        cloud_new: New cloud height [m]
     """
     n_level = len(T_cloud)
     lwc = np.zeros(n_level - 1)
@@ -253,29 +287,38 @@ def mod_ad(T_cloud, p_cloud, z_cloud):
 def pseudoAdiabLapseRate(T, Ws):
     """
     Pseudoadiabatic lapse rate
-    Input: T   [K]  thermodynamic temperature
-    Ws   [1]  mixing ratio of saturation
-    Output: PSEUDO [K/m] pseudoadiabatic lapse rate
-    Constants: Grav   [m/s2]     : constant of acceleration
-        CP  [J/(kg K)]    : specific heat cap. at const. press
-        Rair  [J/(kg K)]  : gas constant of dry air
-        Rvapor [J/(kg K)] : gas constant of water vapor
+
+    Adapted from PAMTRA:
+    Mech, M., Maahn, M., Kneifel, S., Ori, D., Orlandi, E., Kollias, P., Schemann, V.,
+    and Crewell, S.: PAMTRA 1.0: the Passive and Active Microwave radiative TRAnsfer
+    tool for simulating radiometer and radar measurements of the cloudy atmosphere,
+    Geosci. Model Dev., 13, 4229–4251, https://doi.org/10.5194/gmd-13-4229-2020, 2020
+
+    Input:
+        T [K]: thermodynamic temperature
+        Ws [1]: mixing ratio of saturation
+    Output:
+        PSEUDO [K/m]: pseudoadiabatic lapse rate
+    Constants:
+        Grav [m/s2]: constant of acceleration
+        CP [J/(kg K)]: specific heat cap. at const. press
+        Rair [J/(kg K)]: gas constant of dry air
+        Rvapor [J/(kg K)]: gas constant of water vapor
     Source: Rogers and Yau, 1989: A Short Course in Cloud Physics
     (III.Ed.), Pergamon Press, 293p. Page 32
-    translated to Python from pseudo1.pro by mx
     """
 
     # Compute specific humidity of vaporisation
     L = spec_heat(T)
 
     # Compute pseudo-adiabatic temperature gradient
-    x = (
+    pseudo = (
         (con.g0 / con.SPECIFIC_HEAT)
         * (1 + (L * Ws / con.RS / T))
         / (1 + (Ws * L**2 / con.SPECIFIC_HEAT / con.RW / T**2))
     )
 
-    return x
+    return pseudo
 
 
 def get_cloud_prop(
@@ -340,12 +383,18 @@ def get_cloud_prop(
 
 def era5_geopot(level, ps, gpot, temp, hum) -> tuple[np.ndarray, np.ndarray]:
     """
-    :param level: Model level
-    :param ps: Surface Pressure
-    :param gpot: Geopotential Height at Surface
-    :param temp: Temperature
-    :param hum: Humidity
-    :return: Height, Pressure
+    Compute geopotential height and pressure from ERA5 model levels.
+    Adapted from compute_geopotential_on_ml.py, Copyright 2023 ECMWF.
+
+    Input:
+        level: Model level
+        ps: Surface Pressure
+        gpot: Geopotential Height at Surface
+        temp: Temperature
+        hum: Humidity
+    Output:
+        z_f: Geopotential height on model levels
+        pres: Pressure on model levels
     """
     file_mh = (
         os.path.dirname(os.path.realpath(__file__))
