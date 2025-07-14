@@ -1,4 +1,5 @@
-"""SimArray Class"""
+"""SimArray Class."""
+
 from datetime import datetime, timezone
 
 import netCDF4
@@ -10,11 +11,13 @@ from mwrpy_sim.utils import MetaData
 
 class SimArray:
     """Stores netCDF4 variables, numpy arrays and scalars as SimArrays.
+
     Args:
         variable: The netCDF4 :class:`Variable` instance,
         numpy array (masked or regular), or scalar (float, int).
         name: Name of the variable.
         units_from_user: Units of the variable.
+
     Attributes:
         name (str): Name of the variable.
         data (ndarray): The actual data.
@@ -39,7 +42,6 @@ class SimArray:
 
     def fetch_attributes(self) -> list:
         """Returns list of user-defined attributes."""
-
         attributes = []
         for attr in self.__dict__:
             if attr not in ("name", "data", "variable", "dimensions"):
@@ -48,7 +50,6 @@ class SimArray:
 
     def set_attributes(self, attributes: MetaData) -> None:
         """Overwrites existing instance attributes."""
-
         for key in attributes._fields:  # To iterate namedtuple fields.
             data = getattr(attributes, key)
             if data:
@@ -96,7 +97,6 @@ class Sim:
 
 def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
     """Saves the Sim MWR file."""
-
     dims = {
         "time": len(sim.data["time"].data),
         "frequency": len(sim.data["frequency"].data),
@@ -113,13 +113,13 @@ def init_file(
     file_name: str, dimensions: dict, sim_arrays: dict, att_global: dict
 ) -> netCDF4.Dataset:
     """Initializes a Sim MWR file for writing.
+
     Args:
         file_name: File name to be generated.
         dimensions: Dictionary containing dimension for this file.
         sim_arrays: Dictionary containing :class:`SimArray` instances.
         att_global: Dictionary containing site specific global attributes
     """
-
     nc_file = netCDF4.Dataset(file_name, "w", format="NETCDF4_CLASSIC")
     for key, dimension in dimensions.items():
         nc_file.createDimension(key, dimension)
@@ -143,7 +143,6 @@ def _get_dimensions(nc_file: netCDF4.Dataset, data: np.ndarray) -> tuple | tuple
 
 def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
     """Iterates over instances and writes to netCDF file."""
-
     for obj in mwr_variables.values():
         if obj.data_type == "f4":
             fill_value = -999.0
@@ -155,17 +154,37 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             size = "time"
         if obj.name == "elevation_angle":
             size = "elevation_angle"
-        if obj.name in ("iwv", "lwp", "lwp_pro"):
+        if obj.name in (
+            "iwv",
+            "lwp",
+            "lwp_pro",
+            "k_index",
+            "ko_index",
+            "total_totals_index",
+            "lifted_index",
+            "showalter_index",
+            "cape",
+        ):
             size = "time"
         if obj.name in ("tb", "tb_pro", "tb_clr"):
             size = ("time", "frequency", "elevation_angle")
-        if obj.name in ("air_temperature", "absolute_humidity", "air_pressure"):
+        if obj.name in (
+            "air_temperature",
+            "absolute_humidity",
+            "air_pressure",
+            "relative_humidity",
+            "lwc",
+            "lwc_pro",
+        ):
             size = ("time", "height")
         if obj.name in (
             "height_in",
             "air_temperature_in",
             "absolute_humidity_in",
             "air_pressure_in",
+            "relative_humidity_in",
+            "lwc_in",
+            "lwc_pro_in",
         ):
             size = ("time", "height_input")
         nc_variable = nc_file.createVariable(

@@ -17,9 +17,7 @@ def calc_mw_rt(
     coeff_bdw: dict,
     ape_ang: np.ndarray,
 ):
-    """
-    non-scattering microwave radiative transfer
-    """
+    """Non-scattering microwave radiative transfer."""
     config = read_config(None, "global_specs")
     if (
         config["cloud"].split()[-1] == "excluded"
@@ -160,8 +158,8 @@ def TAU_CALC(
     config: dict,
     theta: float,
 ) -> np.ndarray:
-    """
-    Calculate optical thickness tau.
+    """Calculate optical thickness tau.
+
     Args:
         z: Height profile (km above observation height).
         T: Temperature profile (K).
@@ -171,6 +169,7 @@ def TAU_CALC(
         f: Frequency in GHz.
         config: Configuration dictionary.
         theta: Zenith angle of observation in degrees.
+
     Returns:
         tau: Optical thickness profile (tau).
     """
@@ -306,7 +305,6 @@ def ray_tracing(
     note::
         The algorithm assumes that x decays exponentially over each layer.
     """
-
     deg2rad = np.pi / 180
     re = 6370949.0
     ds = np.zeros(z.shape)
@@ -385,10 +383,10 @@ def TB_CALC(frq: np.ndarray, t: np.ndarray, taulay: np.ndarray) -> np.ndarray:
         frq (numpy.ndarray): Frequency vector in GHz.
         t (numpy.ndarray): Temperature profile in K.
         taulay (numpy.ndarray): Optical thickness profile.
+
     Returns:
         numpy.ndarray: Brightness temperatures in K.
     """
-
     hvk = np.dot(frq * 1e9, con.h) / con.kB
     tauprof = np.cumsum(taulay, axis=1)
     boft = 1.0 / (

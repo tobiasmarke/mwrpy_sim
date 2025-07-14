@@ -32,20 +32,30 @@ MWRpy_sim can be run using the command line tool `mwrpy_sim/cli.py`:
 
 Arguments:
 
-| Short | Long      | Default           | Description                                                                        |
-| :---- | :-------- | :---------------- | :--------------------------------------------------------------------------------- |
-| `-s`  | `--site`  |                   | Site to process data from, e.g, `lindenberg`. Required.                            |
-| `-d`  | `--date`  |                   | Single date to be processed. Alternatively, `--start` and `--stop` can be defined. |
-|       | `--start` | `current day - 1` | Starting date.                                                                     |
-|       | `--stop`  | `current day `    | Stopping date.                                                                     |
+| Short | Long       | Default           | Description                                                                        |
+| :---- | :--------- | :---------------- | :--------------------------------------------------------------------------------- |
+| `-s`  | `--site`   |                   | Site to process data from, e.g, `lindenberg`. Required.                            |
+|       | `--source` |                   | Data source for radiative transfer calculations, e.g. `ifs`. Required.             |
+| `-d`  | `--date`   |                   | Single date to be processed. Alternatively, `--start` and `--stop` can be defined. |
+|       | `--start`  | `current day - 1` | Starting date.                                                                     |
+|       | `--stop`   | `current day `    | Stopping date.                                                                     |
+
+Supported data sources are:
+
+| Input Type            | Description                    |
+| :-------------------- | :----------------------------- |
+| `ifs`                 | IFS data from ECMWF.           |
+| `radiosonde`          | Radiosonde data from DWD.      |
+| `vaisala`             | Vaisala radiosonde data.       |
+| `era5`                | ERA5 data from ECMWF.          |
+| `get_era5`            | Download ERA5 data from ECMWF. |
+| `standard_atmosphere` | US Standard Atmosphere 1976.   |
 
 Commands:
 
-| Command               | Description                       |
-| :-------------------- | :-------------------------------- |
-| `ifs`                 | Process IFS data (default).       |
-| `radiosonde`          | Process radiosonde data.          |
-| `vaisala`             | Process Vaisala radiosonde data.  |
-| `era5`                | Process ERA5 data.                |
-| `get_era5`            | Download ERA5 data.               |
-| `standard_atmosphere` | Process standard atmosphere data. |
+| Command    | Description                      |
+| :--------- | :------------------------------- |
+| `process`  | Process and plot data (default). |
+| `plot`     | Plot input data statistics.      |
+| `no-plot`  | Process data only (no plots).    |
+| `get_era5` | Download ERA5 data from ECMWF.   |

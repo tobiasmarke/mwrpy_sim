@@ -93,7 +93,7 @@ variables:
     internal_varname: "ascent_flag"
   sounding:
     attrs:
-      cf_role: "trajecotry_id"
+      cf_role: "trajectory_id"
       long_name: "sounding identifier"
       description: "unique string describing the soundings origin (PLATFORM_SND-DIRECTION_LAT_LON_TIME)"
     encodings:
@@ -162,7 +162,7 @@ variables:
   dz:
     attrs:
       long_name: "ascent/descent rate of measuring device"
-      description: "calculated from interpolated geopotential height changes (artifical rate)"
+      description: "calculated from interpolated geopotential height changes (artificial rate)"
       units: "m/s"
       coordinates: "lon lat alt flight_time launch_time sounding"
       ancillary_variables: "N_ptu m_ptu"

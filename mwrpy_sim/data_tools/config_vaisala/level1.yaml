@@ -188,7 +188,7 @@ variables:
     internal_varname: "longitude"
   sounding:
     attrs:
-      cf_role: "trajecotry_id"
+      cf_role: "trajectory_id"
       long_name: "sounding identifier"
       description: "unique string describing the soundings origin (PLATFORM_SND-DIRECTION_LAT_LON_TIME)"
     encodings:

@@ -21,15 +21,12 @@ def _parse_args(args):
         "command",
         nargs="?",
         choices=[
-            "ifs",
-            "radiosonde",
-            "vaisala",
-            "era5",
-            "icon",
+            "process",
+            "plot",
+            "no-plot",
             "get_era5",
-            "standard_atmosphere",
         ],
-        default="standard_atmosphere",
+        default="process",
         help="Command to execute.",
     )
     group = parser.add_argument_group(title="General options")
@@ -39,6 +36,21 @@ def _parse_args(args):
         required=True,
         help="Site to process data from, e.g. juelich",
         type=str,
+    )
+    group.add_argument(
+        "--source",
+        required=True,
+        help="Data source for radiative transfer calculations, e.g. ifs",
+        type=str,
+        choices=[
+            "ifs",
+            "radiosonde",
+            "vaisala",
+            "era5",
+            "icon",
+            "get_era5",
+            "standard_atmosphere",
+        ],
     )
     group.add_argument(
         "--start",

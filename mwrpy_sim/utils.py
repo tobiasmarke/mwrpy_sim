@@ -133,6 +133,7 @@ def str_to_numeric(value: str) -> int | float:
 def isscalar(array: Any) -> bool:
     """Tests if input is scalar.
     By "scalar" we mean that array has a single value.
+
     Examples:
         >>> isscalar(1)
             True
@@ -143,7 +144,6 @@ def isscalar(array: Any) -> bool:
         >>> isscalar(np.array([1]))
             True
     """
-
     arr = ma.array(array)
     if not hasattr(arr, "__len__") or arr.shape == () or len(arr) == 1:
         return True
@@ -190,8 +190,9 @@ def read_bandwidth_coefficients() -> dict:
     FRIN = loadCoeffsJSON(path)
     coeff_bdw["bdw_wgh"] = FRIN["FRIN"].T
 
-    coeff_bdw["f_all"], coeff_bdw["ind1"] = np.empty(0, np.float32), np.zeros(
-        1, np.int32
+    coeff_bdw["f_all"], coeff_bdw["ind1"] = (
+        np.empty(0, np.float32),
+        np.zeros(1, np.int32),
     )
     for ff in range(7):
         ifr = np.where(coeff_bdw["bdw_wgh"][ff, :] > 0.0)[0]
@@ -229,9 +230,11 @@ def get_time() -> str:
 
 def get_date_from_past(n: int, reference_date: str | None = None) -> str:
     """Return date N-days ago.
+
     Args:
         n: Number of days to skip (can be negative, when it means the future).
         reference_date: Date as "YYYY-MM-DD". Default is the current date.
+
     Returns:
         str: Date as "YYYY-MM-DD".
     """
@@ -286,7 +289,7 @@ def dcerror(x, y):
     if y >= 0:
         DCERROR = w
     else:
-        DCERROR = 2.0 * np.exp(-complex(x, y) ** 2) - w
+        DCERROR = 2.0 * np.exp(-(complex(x, y) ** 2)) - w
 
     return DCERROR
 
@@ -319,7 +322,6 @@ def exponential_integration(
         * sxds (numpy.ndarray): Integral of x*ds over levels ibeg to iend
     adapted from pyrtlib
     """
-
     sxds = 0.0
     xds = np.zeros(ds.shape)
     for i in range(ibeg, iend):
