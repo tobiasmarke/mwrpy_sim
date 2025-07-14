@@ -18,16 +18,18 @@ dependencies = [
   "matplotlib",
   "metpy",
   "netCDF4",
-  "numba",
+  "numpy",
   "pandas",
   "pysonde",
-  "pyyaml",
-  "xarray",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["mypy", "pre-commit", "pylint", "pysonde", "pytest", "pytest-flakefinder", "types-PyYAML", "types-pytz"]
+test = ["mypy", "pytest", "pytest-flakefinder", "ruff", "types-PyYAML", "types-pytz"]
+dev = ["pre-commit", "release-version"]
+
+[project.scripts]
+mwrpy_sim = "mwrpy_sim.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/tobiasmarke/mwrpy_sim"
@@ -38,36 +40,35 @@ Changelog = "https://github.com/tobiasmarke/mwrpy_sim/blob/main/CHANGELOG.md"
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["cdsapi.*", "matplotlib.*", "metpy.*", "netCDF4.*", "numba.*", "numpy.*", "pandas.*", "pysonde.*", "xarray.*"]
+module = ["cdsapi.*", "matplotlib.*", "metpy.*", "netCDF4.*", "numpy.*", "pandas.*", "pysonde.*"]
 ignore_missing_imports = true
-
-[tool.pylint]
-max-line-length = 88
-ignored-modules = ["cdsapi", "metpy", "netCDF4", "numba", "numpy", "pysonde", "xarray"]
-disable = [
-  "duplicate-code",
-  "eval-used",
-  "fixme",
-  "invalid-name",
-  "logging-fstring-interpolation",
-  "logging-not-lazy",
-  "missing-class-docstring",
-  "missing-function-docstring",
-  "missing-module-docstring",
-  "too-few-public-methods",
-  "too-many-arguments",
-  "too-many-branches",
-  "too-many-function-args",
-  "too-many-instance-attributes",
-  "too-many-lines",
-  "too-many-locals",
-  "too-many-statements",
-]
 
 [tool.release-version]
 filename = "pyproject.toml"
 pattern = "version = \"(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)\""
 changelog = "CHANGELOG.md" # optional
+
+[tool.ruff.lint]
+select = ["D", "I"]
+ignore = [
+  "D100", # allow missing documentation
+  "D101", # allow missing documentation
+  "D102", # allow missing documentation
+  "D103", # allow missing documentation
+  "D104", # allow missing documentation
+  "D105", # allow missing documentation
+  "D106", # allow missing documentation
+  "D107", # allow missing documentation
+  "D205", # allow long multi-line summary
+  "D211", # conflicting documentation rule
+  "D213", # conflicting documentation rule
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.setuptools.dynamic]
 version = {attr = "mwrpy_sim.version.__version__"}

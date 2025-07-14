@@ -7,8 +7,8 @@ import netCDF4 as nc
 import numpy as np
 
 from mwrpy_sim import sim_mwr
-from mwrpy_sim.era5_download.get_era5 import era5_request
-from mwrpy_sim.prepare_input import (
+from mwrpy_sim.data_tools.era5_download.get_era5 import era5_request
+from mwrpy_sim.data_tools.prepare_input import (
     prepare_era5_mod,
     prepare_era5_pres,
     prepare_icon,
@@ -17,6 +17,7 @@ from mwrpy_sim.prepare_input import (
     prepare_standard_atmosphere,
     prepare_vaisala,
 )
+from mwrpy_sim.plot.plotting import plot_sim_data
 from mwrpy_sim.rad_trans.rad_trans_meta import get_data_attributes
 from mwrpy_sim.rad_trans.run_rad_trans import rad_trans
 from mwrpy_sim.utils import (
@@ -41,19 +42,33 @@ def main(args):
     stop_date = isodate2date(_stop_date)
     global_specs = read_config(args.site, "global_specs")
     params = read_config(args.site, "params")
+    file_name = _get_filename(args.source, start_date, stop_date, args.site)
     if args.command == "get_era5":
         era5_request(args.site, params, start_date, stop_date)
-    else:
-        data_nc = process_input(args.command, args.site, start_date, stop_date, params)
+    elif args.command in ("process", "no-plot"):
+        data_nc = process_input(args.source, args.site, start_date, stop_date, params)
         if (len(data_nc) > 0) & ("height_in" in data_nc):
-            output_file = _get_filename(args.command, start_date, stop_date, args.site)
-            output_dir = os.path.dirname(output_file)
+            output_dir = os.path.dirname(file_name)
             if not os.path.isdir(output_dir):
                 os.makedirs(output_dir)
             sim_in = sim_mwr.Sim(data_nc)
-            sim_in.data = get_data_attributes(sim_in.data, args.command)
-            logging.info(f"Saving output file {output_file}")
-            sim_mwr.save_sim(sim_in, output_file, global_specs, args.command)
+            sim_in.data = get_data_attributes(sim_in.data, args.source)
+            logging.info(f"Saving output file {file_name}")
+            sim_mwr.save_sim(sim_in, file_name, global_specs, args.source)
+    if args.command in ("process", "plot"):
+        if not os.path.isfile(file_name):
+            logging.error(f"File {file_name} does not exist.")
+        else:
+            sim_data = nc.Dataset(file_name)
+            plot_sim_data(
+                sim_data,
+                args.site,
+                args.source,
+                args.date,
+                args.start,
+                args.stop,
+                params["plot_pth"],
+            )
     elapsed_time = time.process_time() - start
     logging.info(f"Processing took {elapsed_time:.1f} seconds")
 
@@ -201,7 +216,9 @@ def process_input(
                 + stop_date.strftime("%Y%m%d"),
             )
         if len(file_name) == 1:
-            with (nc.Dataset(str(np.sort(file_name)[0])) as era5_data,):
+            with (
+                nc.Dataset(str(np.sort(file_name)[0])) as era5_data,
+            ):
                 for index, hour in enumerate(era5_data["valid_time"]):
                     date_i = seconds2date(hour, (1970, 1, 1))
                     if date_i[-2:] == "00":
@@ -254,10 +271,10 @@ def process_input(
                         for key, array in output_hour.items():
                             data_nc = append_data(data_nc, key, array)
 
-    if site == "standard_atmosphere":
+    if source == "standard_atmosphere":
         data_in = params["data_std"] + "standard_atmospheres.nc"
         with nc.Dataset(data_in) as sa_data:
-            logging.info(f"Radiative transfer using {site} data")
+            logging.info(f"Radiative transfer using {source} data")
             input_sa = prepare_standard_atmosphere(sa_data)
             data_nc = call_rad_trans(input_sa, params)
 
@@ -283,7 +300,7 @@ def call_rad_trans(data_in: dict, params: dict) -> dict:
 
 
 class SimIn:
-    """Class for radiative transfer input files"""
+    """Class for radiative transfer input files."""
 
     def __init__(self, data_in: dict):
         self.data: dict = {}

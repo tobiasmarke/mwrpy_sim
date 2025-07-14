@@ -1,10 +1,11 @@
-"""Module for Radiative Transfer Metadata"""
+"""Module for Radiative Transfer Metadata."""
 
 from mwrpy_sim.utils import MetaData
 
 
 def get_data_attributes(sim_variables: dict, source: str) -> dict:
     """Adds Metadata for Sim MWR variables for NetCDF file writing.
+
     Args:
         sim_variables: SimArray instances.
         source: Data type of the netCDF file.
@@ -19,7 +20,6 @@ def get_data_attributes(sim_variables: dict, source: str) -> dict:
         from rad_trans.rad_trans_meta import get_data_attributes
         att = get_data_attributes('data','data_type')
     """
-
     if source not in (
         "ifs",
         "radiosonde",
@@ -108,6 +108,21 @@ ATTRIBUTES_SOURCE = {
         long_name="Absolute humidity profile interpolated from ",
         units="kg m-3",
     ),
+    "relative_humidity": MetaData(
+        long_name="Relative humidity profile interpolated from ",
+        standard_name="relative_humidity",
+        units="1",
+    ),
+    "lwc": MetaData(
+        long_name="Liquid water content profile interpolated from ",
+        standard_name="atmosphere_cloud_liquid_water_content",
+        units="kg m-3",
+    ),
+    "lwc_pro": MetaData(
+        long_name="Liquid water content profile (prognostic) interpolated from ",
+        standard_name="atmosphere_cloud_liquid_water_content",
+        units="kg m-3",
+    ),
     "lwp": MetaData(
         long_name="Column-integrated liquid water path derived from ",
         standard_name="atmosphere_cloud_liquid_water_content",
@@ -123,6 +138,42 @@ ATTRIBUTES_SOURCE = {
         standard_name="atmosphere_mass_content_of_water_vapor",
         units="kg m-2",
     ),
+    "k_index": MetaData(
+        long_name="K-index derived from ",
+        standard_name="k_index",
+        units="K",
+        comment="K-index is a measure of atmospheric instability",
+    ),
+    "ko_index": MetaData(
+        long_name="KO-index derived from ",
+        standard_name="ko_index",
+        units="K",
+        comment="KO-index is a measure of atmospheric stability",
+    ),
+    "total_totals_index": MetaData(
+        long_name="Total Totals Index derived from ",
+        standard_name="total_totals_index",
+        units="K",
+        comment="Total Totals Index is a measure of atmospheric instability",
+    ),
+    "lifted_index": MetaData(
+        long_name="Lifted Index derived from ",
+        standard_name="lifted_index",
+        units="K",
+        comment="Lifted Index is a measure of atmospheric stability",
+    ),
+    "showalter_index": MetaData(
+        long_name="Showalter Index derived from ",
+        standard_name="showalter_index",
+        units="K",
+        comment="Showalter Index is a measure of atmospheric stability",
+    ),
+    "cape": MetaData(
+        long_name="Convective available potential energy derived from ",
+        standard_name="convective_available_potential_energy",
+        units="J kg-1",
+        comment="CAPE is a measure of the amount of energy available for convection",
+    ),
     "air_temperature_in": MetaData(
         long_name="Input temperature profile from ",
         standard_name="air_temperature",
@@ -135,6 +186,21 @@ ATTRIBUTES_SOURCE = {
     ),
     "absolute_humidity_in": MetaData(
         long_name="Input absolute humidity profile from ",
+        units="kg m-3",
+    ),
+    "relative_humidity_in": MetaData(
+        long_name="Input relative humidity profile from ",
+        standard_name="relative_humidity",
+        units="1",
+    ),
+    "lwc_in": MetaData(
+        long_name="Liquid water content profile from ",
+        standard_name="atmosphere_cloud_liquid_water_content",
+        units="kg m-3",
+    ),
+    "lwc_pro_in": MetaData(
+        long_name="Liquid water content profile (prognostic) from ",
+        standard_name="atmosphere_cloud_liquid_water_content",
         units="kg m-3",
     ),
 }

@@ -1,3 +1,5 @@
+"""Prepare input data for MWRPy sim."""
+
 import os
 
 import metpy.calc
@@ -6,7 +8,14 @@ import numpy as np
 from metpy.units import units
 
 import mwrpy_sim.constants as con
-from mwrpy_sim.atmos import era5_geopot, moist_rho_rh, q2rh
+from mwrpy_sim.atmos import (
+    abs_hum,
+    calc_rho,
+    era5_geopot,
+    hum_to_iwv,
+    moist_rho_rh,
+    q2rh,
+)
 from mwrpy_sim.utils import seconds_since_epoch
 
 
@@ -24,7 +33,7 @@ def prepare_ifs(ifs_data: nc.Dataset, index: int, date_i: str) -> dict:
     )
     input_ifs["time"] = seconds_since_epoch(date_i)
 
-    return input_ifs
+    return _add_vars(input_ifs)
 
 
 def prepare_standard_atmosphere(sa_data: nc.Dataset) -> dict:
@@ -41,7 +50,7 @@ def prepare_standard_atmosphere(sa_data: nc.Dataset) -> dict:
     )
     input_sa["time"] = 0
 
-    return input_sa
+    return _add_vars(input_sa)
 
 
 def prepare_radiosonde(rs_data: nc.Dataset) -> dict:
@@ -59,7 +68,7 @@ def prepare_radiosonde(rs_data: nc.Dataset) -> dict:
     #     str(rs_data.variables["BEZUGSDATUM_SYNOP"][-1].data)
     # )
 
-    return input_rs
+    return _add_vars(input_rs)
 
 
 def prepare_vaisala(vs_data: nc.Dataset, altitude: float) -> dict:
@@ -98,7 +107,7 @@ def prepare_vaisala(vs_data: nc.Dataset, altitude: float) -> dict:
         vs_data.date_YYYYMMDDTHHMM[0:8] + vs_data.date_YYYYMMDDTHHMM[9:11]
     )
 
-    return input_vs
+    return _add_vars(input_vs)
 
 
 def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
@@ -138,7 +147,7 @@ def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
     input_icon["time"] = seconds_since_epoch(date_i)
     input_icon["iwv"] = icon_data["TQV"][index]
 
-    return input_icon
+    return _add_vars(input_icon)
 
 
 def prepare_era5_mod(
@@ -157,13 +166,13 @@ def prepare_era5_mod(
     input_era5["air_temperature"] = np.flip(
         np.mean(mod_data_pro["t"][index, :, :, :], axis=(1, 2))
     )[:]
-    input_era5[
-        "relative_humidity"
-    ] = metpy.calc.relative_humidity_from_specific_humidity(
-        input_era5["air_pressure"] * units.Pa,
-        units.Quantity(input_era5["air_temperature"], "K"),
-        np.flip(np.mean(mod_data_pro["q"][index, :, :, :], axis=(1, 2)))[:],
-    ).magnitude
+    input_era5["relative_humidity"] = (
+        metpy.calc.relative_humidity_from_specific_humidity(
+            input_era5["air_pressure"] * units.Pa,
+            units.Quantity(input_era5["air_temperature"], "K"),
+            np.flip(np.mean(mod_data_pro["q"][index, :, :, :], axis=(1, 2)))[:],
+        ).magnitude
+    )
     clwc = np.flip(np.mean(mod_data_pro["clwc"][index, :, :, :], axis=(1, 2)))[:]
     mxr = metpy.calc.mixing_ratio_from_relative_humidity(
         units.Quantity(input_era5["air_pressure"], "Pa"),
@@ -178,7 +187,7 @@ def prepare_era5_mod(
     input_era5["lwc"] = clwc * rho.magnitude
     input_era5["time"] = seconds_since_epoch(date_i)
 
-    return input_era5
+    return _add_vars(input_era5)
 
 
 def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
@@ -208,4 +217,26 @@ def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
     input_era5["lwc"] = clwc * rho.magnitude
     input_era5["time"] = seconds_since_epoch(date_i)
 
-    return input_era5
+    return _add_vars(input_era5)
+
+
+def _add_vars(input_dat) -> dict:
+    """Add variables to input data dictionary."""
+    if "absolute_humidity" not in input_dat:
+        input_dat["absolute_humidity"] = abs_hum(
+            input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
+        )
+    input_dat["e"] = calc_rho(
+        input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
+    )
+    if "iwv" not in input_dat:
+        input_dat["iwv"] = (
+            hum_to_iwv(
+                input_dat["absolute_humidity"][:],
+                input_dat["height"][:],
+            )
+            if not np.any(input_dat["absolute_humidity"].mask)
+            else -999.0
+        )
+
+    return input_dat

@@ -1,5 +1,6 @@
-"""
-This class contains the absorption models used in mwrpy_sim. Adapted from:
+"""This class contains the absorption models used in mwrpy_sim.
+
+Adapted from:
 Rosenkranz, P.W.: Line-by-line microwave radiative transfer (non-scattering)
 [2022] (version 2022/08/25),
 [2024] (version 2024/07/03),
@@ -17,17 +18,16 @@ def ABWV_R22(
     RHO,  # abs. humidity in gm-3
     T,  # temp. in K
     P,  # pressure in hPa
-    F,  # freqeuncy in GHz
+    F,  # frequency in GHz
 ):
-    """
-    ABSORPTION COEF IN ATMOSPHERE DUE TO WATER VAPOR
-      T       KELVIN    I   TEMPERATURE
-      P       MILLIBAR  I   PRESSURE              .1 TO 1000
-      RHO     G/M**3    I   WATER VAPOR DENSITY
-      F       GHZ       I   FREQUENCY             0 TO 800
-      ALPHA   NEPERS/KM O   ABSORPTION COEFFICIENT
-    """
+    """ABSORPTION COEF IN ATMOSPHERE DUE TO WATER VAPOR.
 
+    T       KELVIN    I   TEMPERATURE
+    P       MILLIBAR  I   PRESSURE              .1 TO 1000
+    RHO     G/M**3    I   WATER VAPOR DENSITY
+    F       GHZ       I   FREQUENCY             0 TO 800
+    ALPHA   NEPERS/KM O   ABSORPTION COEFFICIENT
+    """
     if RHO <= 0.0:
         return 0.0
 
@@ -107,17 +107,16 @@ def ABWV_R24(
     RHO,  # abs. humidity in gm-3
     T,  # temp. in K
     P,  # pressure in hPa
-    F,  # freqeuncy in GHz
+    F,  # frequency in GHz
 ):
-    """
-    ABSORPTION COEF IN ATMOSPHERE DUE TO WATER VAPOR
-      T       KELVIN    I   TEMPERATURE
-      P       MILLIBAR  I   PRESSURE              .1 TO 1000
-      RHO     G/M**3    I   WATER VAPOR DENSITY
-      F       GHZ       I   FREQUENCY             0 TO 800
-      ALPHA   NEPERS/KM O   ABSORPTION COEFFICIENT
-    """
+    """ABSORPTION COEF IN ATMOSPHERE DUE TO WATER VAPOR.
 
+    T       KELVIN    I   TEMPERATURE
+    P       MILLIBAR  I   PRESSURE              .1 TO 1000
+    RHO     G/M**3    I   WATER VAPOR DENSITY
+    F       GHZ       I   FREQUENCY             0 TO 800
+    ALPHA   NEPERS/KM O   ABSORPTION COEFFICIENT
+    """
     if RHO <= 0.0:
         return 0.0
 
@@ -210,8 +209,8 @@ def H2OCON(F, T):
 
 
 def ABO2_R22(TEMP, PRES, VAPDEN, FREQ):
-    """
-    ABSORPTION COEFFICIENT DUE TO OXYGEN IN AIR
+    """ABSORPTION COEFFICIENT DUE TO OXYGEN IN AIR.
+
     TEMP    KELVIN   TEMPERATURE        UNCERTAIN, but believed to be
                                          valid for atmosphere
     PRES   MILLIBARS PRESSURE           3 TO 1000
@@ -219,7 +218,6 @@ def ABO2_R22(TEMP, PRES, VAPDEN, FREQ):
                      DUE TO GREATER BROADENING EFFICIENCY OF H2O)
     FREQ    GHZ      FREQUENCY          0 TO 900
     """
-
     path = os.path.dirname(os.path.realpath(__file__)) + "/coeff/r22/o2_list.json"
     CF = loadCoeffsJSON(path)
 
@@ -309,21 +307,17 @@ def ABO2_R24(TEMP, PRES, VAPDEN, FREQ):
             asd = complex(1.0, YK) * 2.0 * (1.0 - pxw) / width2
             SF1 = np.real(asd)
         else:
-            SF1 = (WIDTH * GFAC + (FREQ - FCEN) * YK) / (
-                (FREQ - FCEN) ** 2 + WIDTH**2
-            )
+            SF1 = (WIDTH * GFAC + (FREQ - FCEN) * YK) / ((FREQ - FCEN) ** 2 + WIDTH**2)
 
-        SF2 = (WIDTH * GFAC - (FREQ + FCEN) * YK) / (
-            (FREQ + FCEN) ** 2.0 + WIDTH**2.0
-        )
+        SF2 = (WIDTH * GFAC - (FREQ + FCEN) * YK) / ((FREQ + FCEN) ** 2.0 + WIDTH**2.0)
         SUMM += A[k] * (SF1 + SF2)
 
     return 1.6097e11 * SUMM * PRESDA * (FREQ * TH) ** 2
 
 
 def ABN2_R(T, P, F):
-    """
-    ABSORPTION COEFFICIENT DUE TO NITROGEN IN AIR
+    """ABSORPTION COEFFICIENT DUE TO NITROGEN IN AIR.
+
     T = TEMPERATURE (K)
     P = PRESSURE (MB)
     F = FREQUENCY (GHZ)
@@ -335,9 +329,7 @@ def ABN2_R(T, P, F):
 
 
 def ABLIQ_R(LWC, F, T):
-    """POWER ABSORPTION COEFFICIENT
-    BY SUSPENDED CLOUD LIQUID WATER DROPLETS."""
-
+    """POWER ABSORPTION COEFFICIENT BY SUSPENDED CLOUD LIQUID WATER DROPLETS."""
     if LWC <= 0.0 or T < 233.0:
         return 0.0
 
@@ -357,12 +349,7 @@ def ABLIQ_R(LWC, F, T):
     kappa -= delta * z / (sd + z)
     delta = 4.008724 * np.exp(-Tc / 103.05)
     hdelta = delta / 2.0
-    f1 = (
-        10.46012
-        + (0.1454962 * Tc)
-        + (0.063267156 * Tc**2)
-        + (0.00093786645 * Tc**3)
-    )
+    f1 = 10.46012 + (0.1454962 * Tc) + (0.063267156 * Tc**2) + (0.00093786645 * Tc**3)
     z1 = complex(-0.75, 1.0) * f1
     z2 = complex(-4500.0, 2000.0)
     cnorm = np.log(z2 / z1)

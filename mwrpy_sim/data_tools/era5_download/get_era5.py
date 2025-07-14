@@ -9,7 +9,8 @@ from mwrpy_sim.utils import _get_filename, read_config
 def era5_request(
     site: str, params: dict, start_date: datetime.date, stop_date: datetime.date
 ):
-    """Function to download ERA5 data from CDS API for specified site and dates
+    """Function to download ERA5 data from CDS API for specified site and dates.
+
     Args:
         site: Name of site
         params: config dictionary
@@ -141,8 +142,9 @@ def era5_request(
 
 
 def get_corner_coord(stn_coord, offset, resol):
-    """get corners of a coordinate box around station coordinates
-    which match model grid points"""
+    """Get corners of a coordinate box around station coordinates
+    which match model grid points.
+    """
     stn_coord_rounded = (
         round(stn_coord / resol) * resol
     )  # round centre coordinate to model resolution
