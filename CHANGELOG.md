@@ -1,3 +1,7 @@
+## 0.7.7 – 2025-07-14
+
+- Improve file structure and add stability indices
+
 ## 0.7.6 – 2025-07-04
 
 - Add "clear-sky" TB variable and update documentation / references
