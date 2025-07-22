@@ -22,15 +22,11 @@ def rad_trans(
     tb_pro = np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
     tb_clr = np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
     lwp, lwp_pro = FillValue, FillValue
-    lwc, lwc_pro = (
-        np.zeros(len(input_dat["height"][:]), np.float32),
-        np.zeros(len(input_dat["height"][:]), np.float32),
-    )
 
     # Cloud geometry [m] / cloud water content (LWC, LWP)
     cloud_methods = (
         ("prognostic", "detected", "clear")
-        if "lwc" in input_dat
+        if "lwc_in" in input_dat
         else ("detected", "clear")
     )
     for method in cloud_methods:
@@ -38,7 +34,7 @@ def rad_trans(
             lwc_tmp, lwp_tmp = np.zeros(len(input_dat["height"][:]), np.float32), 0.0
         else:
             top, base = (
-                detect_cloud_mod(input_dat["height"][:], input_dat["lwc"][:])
+                detect_cloud_mod(input_dat["height"][:], input_dat["lwc_in"][:])
                 if method == "prognostic"
                 else (
                     detect_liq_cloud(
@@ -80,67 +76,42 @@ def rad_trans(
                 np.float32,
             ).T
             if method == "prognostic":
-                lwp_pro, tb_pro, lwc_pro = lwp_tmp, tb_tmp, lwc_tmp
+                lwp_pro, tb_pro, input_dat["lwc_pro"] = lwp_tmp, tb_tmp, lwc_tmp
             elif method == "detected":
-                lwp, tb, lwc = lwp_tmp, tb_tmp, lwc_tmp
+                lwp, tb, input_dat["lwc"] = lwp_tmp, tb_tmp, lwc_tmp
             else:
                 tb_clr = tb_tmp
 
-    # Interpolate to final grid
-    pressure_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        input_dat["air_pressure"][:],
-    )
-    temperature_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        input_dat["air_temperature"][:],
-    )
-    abshum_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        input_dat["absolute_humidity"][:],
-    )
-    relhum_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        input_dat["relative_humidity"][:],
-    )
-    lwc_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        lwc,
-    )
-    lwc_pro_int = np.interp(
-        params["height"],
-        input_dat["height"][:] - input_dat["height"][0],
-        lwc_pro,
-    )
-
+    # Make output dictionary and interpolate to final grid
     output = {
         "time": np.asarray([input_dat["time"]]),
         "tb": np.expand_dims(tb, 0),
         "tb_pro": np.expand_dims(tb_pro, 0),
         "tb_clr": np.expand_dims(tb_clr, 0),
-        "air_temperature": np.expand_dims(temperature_int, 0),
-        "air_pressure": np.expand_dims(pressure_int, 0),
-        "absolute_humidity": np.expand_dims(abshum_int, 0),
-        "relative_humidity": np.expand_dims(relhum_int, 0),
-        "lwc": np.expand_dims(lwc_int, 0),
-        "lwc_pro": np.expand_dims(lwc_pro_int, 0),
         "lwp": np.asarray([lwp]),
         "lwp_pro": np.asarray([lwp_pro]),
         "iwv": np.asarray([input_dat["iwv"]]),
-        # Save input data for further processing:
-        "height_in": np.expand_dims(input_dat["height"][:], 0),
-        "air_temperature_in": np.expand_dims(input_dat["air_temperature"][:], 0),
-        "air_pressure_in": np.expand_dims(input_dat["air_pressure"][:], 0),
-        "absolute_humidity_in": np.expand_dims(input_dat["absolute_humidity"][:], 0),
-        "relative_humidity_in": np.expand_dims(input_dat["relative_humidity"][:], 0),
-        "lwc_in": np.expand_dims(lwc, 0),
-        "lwc_pro_in": np.expand_dims(lwc_pro, 0),
     }
+    var_names = [
+        "air_pressure",
+        "air_temperature",
+        "absolute_humidity",
+        "relative_humidity",
+        "lwc",
+        "lwc_pro",
+    ]
+    for var in var_names:
+        if var in input_dat:
+            output[var] = np.expand_dims(
+                np.interp(
+                    params["height"],
+                    input_dat["height"][:] - input_dat["height"][0],
+                    input_dat[var][:],
+                ),
+                0,
+            )
+        else:
+            output[var] = np.full((1, len(params["height"])), FillValue, np.float32)
 
     # Calculate stability indices
     calc_stability_indices(output, params["height"][:])

@@ -101,7 +101,6 @@ def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
         "time": len(sim.data["time"].data),
         "frequency": len(sim.data["frequency"].data),
         "height": len(sim.data["height"].data),
-        "height_input": sim.data["height_in"].data.shape[1],
         "elevation_angle": len(sim.data["elevation_angle"].data),
     }
 
@@ -177,16 +176,6 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             "lwc_pro",
         ):
             size = ("time", "height")
-        if obj.name in (
-            "height_in",
-            "air_temperature_in",
-            "absolute_humidity_in",
-            "air_pressure_in",
-            "relative_humidity_in",
-            "lwc_in",
-            "lwc_pro_in",
-        ):
-            size = ("time", "height_input")
         nc_variable = nc_file.createVariable(
             obj.name, obj.data_type, size, zlib=True, fill_value=fill_value
         )

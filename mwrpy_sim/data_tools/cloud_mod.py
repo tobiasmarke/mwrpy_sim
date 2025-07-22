@@ -221,9 +221,9 @@ def get_cloud_prop(
 ) -> tuple[np.ndarray, float]:
     """Calculate cloud properties."""
     if method == "prognostic":
-        lwc_new, height_new = input_dat["lwc"][:], input_dat["height"][:]
+        lwc_new, height_new = input_dat["lwc_in"][:], input_dat["height"][:]
         lwp = np.sum(
-            (input_dat["lwc"][1:] + input_dat["lwc"][:-1])
+            (input_dat["lwc_in"][1:] + input_dat["lwc_in"][:-1])
             / 2.0
             * np.diff(input_dat["height"][:])
         )
