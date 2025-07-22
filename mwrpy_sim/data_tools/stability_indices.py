@@ -6,26 +6,37 @@ from mwrpy_sim.atmos import eq_pot_tem, mixr, t_dew_rh
 
 
 def modify_prof_500m(
-    z: np.ndarray, t: np.ndarray, p: np.ndarray, td: np.ndarray, mr: np.ndarray
+    height: np.ndarray,
+    temperature: np.ndarray,
+    pressure: np.ndarray,
+    dewpoint: np.ndarray,
+    mixing_ratio: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Modify profiles below 500 m with average value.
 
     Input:
-        z: Height array (m)
-        t: Temperature array (K)
-        p: Pressure array (Pa)
-        td: Dew point temperature array (K)
-        mr: Mixing ratio array (kg/kg)
+        height: Height array (m)
+        temperature: Temperature array (K)
+        pressure: Pressure array (Pa)
+        dewpoint: Dewpoint temperature array (K)
+        mixing_ratio: Mixing ratio array (kg/kg)
 
     Output:
         Modified temperature profile
     """
-    ind_500 = np.where(z <= 500)[0]
+    ind_500 = np.where(height <= 500)[0]
+    z = height.copy()
+    t = temperature.copy()
+    p = pressure.copy()
+    td = dewpoint.copy()
+    mr = mixing_ratio.copy()
     if len(ind_500) > 0:
         t[:, ind_500] = np.mean(t[:, ind_500])
         p[:, ind_500] = np.mean(p[:, ind_500])
         td[:, ind_500] = np.mean(td[:, ind_500])
         mr[:, ind_500] = np.mean(mr[:, ind_500])
+    else:
+        ind_500 = [0]
     return (
         z[ind_500[-1] :],
         t[:, ind_500[-1] :],
@@ -116,20 +127,19 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     )
 
     # Calculate ko index
-    p_ind_1000 = (
-        0
-        if p_ind(1000, data_dict["air_pressure"]) is None
-        else p_ind(1000, data_dict["air_pressure"])
-    )
-    data_dict["ko_index"] = np.expand_dims(
-        ko_index(
-            eq_pot_t[:, p_ind(700, data_dict["air_pressure"])],
-            eq_pot_t[:, p_ind(500, data_dict["air_pressure"])],
-            eq_pot_t[:, p_ind_1000],
-            eq_pot_t[:, p_ind(850, data_dict["air_pressure"])],
-        ),
-        0,
-    )
+    p_levs = [700, 500, 1000, 850]
+    if not all(p_ind(p, data_dict["air_pressure"]) for p in p_levs):
+        data_dict["ko_index"] = np.full((1, 1), -999.0)
+    else:
+        data_dict["ko_index"] = np.expand_dims(
+            ko_index(
+                eq_pot_t[:, p_ind(700, data_dict["air_pressure"])],
+                eq_pot_t[:, p_ind(500, data_dict["air_pressure"])],
+                eq_pot_t[:, p_ind(1000, data_dict["air_pressure"])],
+                eq_pot_t[:, p_ind(850, data_dict["air_pressure"])],
+            ),
+            0,
+        )
 
     # Calculate total totals index
     data_dict["total_totals_index"] = np.expand_dims(
@@ -152,14 +162,18 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     )
 
     # Calculate showalter index
-    data_dict["showalter_index"] = np.expand_dims(
-        mpcalc.showalter_index(
-            data_dict["air_pressure"][0, :] * units.Pa,
-            data_dict["air_temperature"][0, :] * units.K,
-            units.Quantity(t_dew[0, :], "K"),
-        ).magnitude,
-        0,
-    )
+    try:
+        data_dict["showalter_index"] = np.expand_dims(
+            mpcalc.showalter_index(
+                data_dict["air_pressure"][0, :] * units.Pa,
+                data_dict["air_temperature"][0, :] * units.K,
+                units.Quantity(t_dew[0, :], "K"),
+            ).magnitude,
+            0,
+        )
+    except TypeError:
+        # Handle case where showalter_index cannot be calculated
+        data_dict["showalter_index"] = np.full((1,), -999.0)
 
     # Calculate convective available potential energy (CAPE)
     data_dict["cape"] = np.expand_dims(
