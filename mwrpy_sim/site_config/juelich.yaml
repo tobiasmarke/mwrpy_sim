@@ -9,6 +9,7 @@ params:
   data_ifs: /tests/data/
   data_era5: /tests/data/
   data_out: /tests/data/
+  plot_pth: /tests/plots/
 
 global_specs:
   title: Radiative transfer data for Jülich, Germany

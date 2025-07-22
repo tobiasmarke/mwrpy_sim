@@ -40,6 +40,24 @@ ATTRIBUTES = {
         plot_range=(0, 50),
         source="1d",
     ),
+    "lwc": PlotMeta(
+        name="LWC",
+        xlabel=_GM3,
+        plot_range=(0.0, 0.5),
+        source="profile",
+    ),
+    "lwc_pro": PlotMeta(
+        name="LWC (prognostic)",
+        xlabel=_GM3,
+        plot_range=(0.0, 0.5),
+        source="profile",
+    ),
+    "relative_humidity": PlotMeta(
+        name="Relative humidity",
+        xlabel=_1,
+        plot_range=(0.0, 1.3),
+        source="profile",
+    ),
     "absolute_humidity": PlotMeta(
         name="Absolute humidity",
         xlabel=_KGM3,
@@ -52,28 +70,10 @@ ATTRIBUTES = {
         plot_range=(200.0, 320.0),
         source="profile",
     ),
-    "relative_humidity": PlotMeta(
-        name="Relative humidity",
-        xlabel=_1,
-        plot_range=(0.0, 1.3),
-        source="profile",
-    ),
     "air_pressure": PlotMeta(
         name="Air pressure",
         xlabel=_Pa,
         plot_range=(0.0, 120000.0),
-        source="profile",
-    ),
-    "lwc": PlotMeta(
-        name="LWC",
-        xlabel=_GM3,
-        plot_range=(0.0, 0.5),
-        source="profile",
-    ),
-    "lwc_pro": PlotMeta(
-        name="LWC (prognostic)",
-        xlabel=_GM3,
-        plot_range=(0.0, 0.5),
         source="profile",
     ),
 }

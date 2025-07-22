@@ -6,10 +6,10 @@ params:
   latitude: 52.208
 
   # path to input data and path for processed files
-  data_ifs: /tests/data/
-  data_rs: /data/radiosondes/DWD_highres/lindenberg/
+  data_rs: /tests/data/
   data_era5: /tests/data/
   data_out: /tests/data/
+  plot_pth: /tests/plots/
 
 global_specs:
   title: Radiative transfer data for Lindenberg, Germany
