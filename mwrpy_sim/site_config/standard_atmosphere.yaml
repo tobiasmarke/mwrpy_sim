@@ -8,6 +8,7 @@ params:
   # path to input data and path for processed files
   data_std: /tests/data/
   data_out: /tests/data/
+  plot_pth: /tests/plots/
 
 global_specs:
   title: Radiative transfer data for standard atmosphere

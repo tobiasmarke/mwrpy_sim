@@ -21,6 +21,7 @@ dependencies = [
   "numpy",
   "pandas",
   "pysonde",
+  "scipy",
 ]
 dynamic = ["version"]
 
@@ -40,7 +41,7 @@ Changelog = "https://github.com/tobiasmarke/mwrpy_sim/blob/main/CHANGELOG.md"
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["cdsapi.*", "matplotlib.*", "metpy.*", "netCDF4.*", "numpy.*", "pandas.*", "pysonde.*"]
+module = ["cdsapi.*", "matplotlib.*", "metpy.*", "netCDF4.*", "numpy.*", "pandas.*", "pysonde.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.release-version]

@@ -206,7 +206,7 @@ def TAU_CALC(
     if not np.isclose(theta, 0.0, 1.0):
         method = config["refrac"]
         mu = eval(f"refractivity_{method}")(p, T, rhow)
-        deltaz = ray_tracing(z, mu, 90.0 - theta, z[0])
+        deltaz = ray_tracing(z, mu, 90.0 - theta, float(z[0]))
     else:
         deltaz = np.hstack([0.0, np.diff(z)])
 
@@ -363,8 +363,8 @@ def ray_tracing(
             dtaua = np.abs(tau - taul)
             ds[i] = np.dot(ds[i], (dtaua / (np.dot(2.0, np.sin(np.dot(dtaua, 0.5))))))
         # Make upper boundary into lower boundary for next layer.
-        phil = np.copy(phi)
-        taul = np.copy(tau)
+        phil = float(np.copy(phi))
+        taul = float(np.copy(tau))
         rl = np.copy(r)
         tanthl = np.copy(tanth)
 

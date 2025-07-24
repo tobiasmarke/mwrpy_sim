@@ -38,6 +38,7 @@ def plot_sim_data(
         else:
             data = sim_data.variables[var_name][:].data
             data = np.ma.masked_equal(data, -999.0)
+            data *= 1000.0 if "lwc" in var_name else 1.0
         if data.ndim == 1:
             _plot_histogram(ax, data, meta)
         elif data.ndim == 2:
@@ -46,19 +47,7 @@ def plot_sim_data(
         _set_axis(ax, meta)
 
     # Set the title for the figure
-    if source == "standard_atmosphere":
-        axes[1].set_title(
-            f"MWRpy sim data (source: {source})",
-            fontsize=16,
-        )
-    else:
-        axes[1].set_title(
-            f"MWRpy sim data for {site} (source: {source})\n"
-            f"from {start_d} to {stop_d}"
-            if not date_d
-            else f"MWRpy simulation data for {site} ({source})\n" f"on {date_d}",
-            fontsize=16,
-        )
+    _set_title(axes, source, site, date_d, start_d, stop_d)
 
     # Save the figure
     _handle_saving(site, source, date_d, start_d, stop_d, save_path, show)
@@ -117,6 +106,24 @@ def _set_axis(ax, meta: PlotMeta) -> None:
     ax.set_xlim(meta.plot_range)
     if meta.source == "profile":
         ax.set_ylim(0, 10000)
+
+
+def _set_title(
+    axes, source: str, site: str, date_d: str | None, start_d: str, stop_d: str
+) -> None:
+    """Set the title for the figure."""
+    if source == "standard_atmosphere":
+        axes[1].set_title(
+            f"MWRpy sim data (source: {source})",
+            fontsize=16,
+        )
+    else:
+        axes[1].set_title(
+            f"MWRpy sim data for {site} (source: {source})\nfrom {start_d} to {stop_d}"
+            if not date_d
+            else f"MWRpy simulation data for {site} ({source})\non {date_d}",
+            fontsize=16,
+        )
 
 
 def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:

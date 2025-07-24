@@ -15,7 +15,7 @@ def detect_cloud_mod(z, lwc):
         z_base: array of cloud bases
     """
     i_cloud, i_top, i_base = (
-        np.where(lwc > 0.0)[0],
+        np.array(np.where(lwc > 0.0)[0], dtype=np.int32),
         np.empty(0, np.int32),
         np.empty(0, np.int32),
     )
@@ -63,7 +63,7 @@ def detect_liq_cloud(z, t, rh, p_rs):
     # --> layers where mean rh GT rh_thres
 
     i_cloud, i_top, i_base = (
-        np.where((rh > rh_thres) & (t > t_thres))[0],
+        np.array(np.where((rh > rh_thres) & (t > t_thres))[0], dtype=np.int32),
         np.empty(0, np.int32),
         np.empty(0, np.int32),
     )
@@ -221,9 +221,9 @@ def get_cloud_prop(
 ) -> tuple[np.ndarray, float]:
     """Calculate cloud properties."""
     if method == "prognostic":
-        lwc_new, height_new = input_dat["lwc"][:], input_dat["height"][:]
+        lwc_new, height_new = input_dat["lwc_in"][:], input_dat["height"][:]
         lwp = np.sum(
-            (input_dat["lwc"][1:] + input_dat["lwc"][:-1])
+            (input_dat["lwc_in"][1:] + input_dat["lwc_in"][:-1])
             / 2.0
             * np.diff(input_dat["height"][:])
         )

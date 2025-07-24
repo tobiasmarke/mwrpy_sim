@@ -9,6 +9,7 @@ import numpy as np
 from mwrpy_sim import sim_mwr
 from mwrpy_sim.data_tools.era5_download.get_era5 import era5_request
 from mwrpy_sim.data_tools.prepare_input import (
+    check_height,
     prepare_era5_mod,
     prepare_era5_pres,
     prepare_icon,
@@ -47,7 +48,7 @@ def main(args):
         era5_request(args.site, params, start_date, stop_date)
     elif args.command in ("process", "no-plot"):
         data_nc = process_input(args.source, args.site, start_date, stop_date, params)
-        if (len(data_nc) > 0) & ("height_in" in data_nc):
+        if (len(data_nc) > 0) & ("time" in data_nc):
             output_dir = os.path.dirname(file_name)
             if not os.path.isdir(output_dir):
                 os.makedirs(output_dir)
@@ -100,7 +101,7 @@ def process_input(
                                 f"for {site}, {date_i[:-2]}"
                             )
                         input_ifs = prepare_ifs(ifs_data, index, date_i)
-                        if len(input_ifs["height"]) == 137:
+                        if len(input_ifs) > 0:
                             try:
                                 output_hour = call_rad_trans(input_ifs, params)
                             except ValueError:
@@ -108,51 +109,6 @@ def process_input(
                                 continue
                             for key, array in output_hour.items():
                                 data_nc = append_data(data_nc, key, array)
-
-    elif source == "radiosonde":
-        for date in date_range(start_date, stop_date):
-            file_names = get_file_list(
-                params["data_rs"] + date.strftime("%Y/%m/%d/"), "radiosonde"
-            )
-            for file in file_names:
-                if os.path.isfile(file):
-                    with nc.Dataset(file) as rs_data:
-                        if file == file_names[0]:
-                            logging.info(
-                                f"Radiative transfer using {source} data "
-                                f"for {site}, {date.strftime('%Y%m%d')}"
-                            )
-                        input_rs = prepare_radiosonde(rs_data)
-                    try:
-                        output_hour = call_rad_trans(input_rs, params)
-                    except ValueError:
-                        logging.info(f"Skipping file {file}")
-                        continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
-
-    elif source == "vaisala":
-        for date in date_range(start_date, stop_date):
-            file_name = get_file_list(
-                params["data_vs"], site + "_" + date.strftime("%Y%m%d")
-            )
-            for name in file_name:
-                if os.path.isfile(name):
-                    with nc.Dataset(name) as vs_data:
-                        if name == file_name[0]:
-                            logging.info(
-                                f"Radiative transfer using {source} data "
-                                f"for {site}, {date.strftime('%Y%m%d')}"
-                            )
-                        input_vs = prepare_vaisala(vs_data, params["altitude"])
-                        input_vs["height"] -= params["altitude"]
-                    try:
-                        output_hour = call_rad_trans(input_vs, params)
-                    except ValueError:
-                        logging.info(f"Skipping file {file_name[0]}")
-                        continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)
@@ -235,6 +191,51 @@ def process_input(
                     for key, array in output_hour.items():
                         data_nc = append_data(data_nc, key, array)
 
+    elif source == "radiosonde":
+        for date in date_range(start_date, stop_date):
+            file_names = get_file_list(
+                params["data_rs"] + date.strftime("%Y/%m/%d/"), "radiosonde"
+            )
+            for file in file_names:
+                if os.path.isfile(file):
+                    with nc.Dataset(file) as rs_data:
+                        if file == file_names[0]:
+                            logging.info(
+                                f"Radiative transfer using {source} data "
+                                f"for {site}, {date.strftime('%Y%m%d')}"
+                            )
+                        input_rs = prepare_radiosonde(rs_data)
+                    try:
+                        output_hour = call_rad_trans(input_rs, params)
+                    except ValueError:
+                        logging.info(f"Skipping file {file}")
+                        continue
+                    for key, array in output_hour.items():
+                        data_nc = append_data(data_nc, key, array)
+
+    elif source == "vaisala":
+        for date in date_range(start_date, stop_date):
+            file_name = get_file_list(
+                params["data_vs"], site + "_" + date.strftime("%Y%m%d")
+            )
+            for name in file_name:
+                if os.path.isfile(name):
+                    with nc.Dataset(name) as vs_data:
+                        if name == file_name[0]:
+                            logging.info(
+                                f"Radiative transfer using {source} data "
+                                f"for {site}, {date.strftime('%Y%m%d')}"
+                            )
+                        input_vs = prepare_vaisala(vs_data, params["altitude"])
+                        input_vs["height"] -= params["altitude"]
+                    try:
+                        output_hour = call_rad_trans(input_vs, params)
+                    except ValueError:
+                        logging.info(f"Skipping file {file_name[0]}")
+                        continue
+                    for key, array in output_hour.items():
+                        data_nc = append_data(data_nc, key, array)
+
     elif source == "icon":
         for date in date_range(start_date, stop_date):
             file_name = get_file_list(
@@ -272,11 +273,9 @@ def process_input(
                             data_nc = append_data(data_nc, key, array)
 
     if source == "standard_atmosphere":
-        data_in = params["data_std"] + "standard_atmospheres.nc"
-        with nc.Dataset(data_in) as sa_data:
-            logging.info(f"Radiative transfer using {source} data")
-            input_sa = prepare_standard_atmosphere(sa_data)
-            data_nc = call_rad_trans(input_sa, params)
+        logging.info(f"Radiative transfer using {source} data")
+        input_sa = prepare_standard_atmosphere()
+        data_nc = call_rad_trans(input_sa, params)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
     data_nc["frequency"] = np.array(params["frequency"])
@@ -290,6 +289,7 @@ def call_rad_trans(data_in: dict, params: dict) -> dict:
     coeff_bdw = read_bandwidth_coefficients()
     # Antenna beamwidth
     ape_ang = read_beamwidth_coefficients()
+    data_in = check_height(data_in, params["altitude"])
     data_nc = rad_trans(
         data_in,
         params,

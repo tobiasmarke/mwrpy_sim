@@ -60,11 +60,6 @@ ATTRIBUTES_COM = {
         standard_name="height_above_mean_sea_level",
         units="m",
     ),
-    "height_in": MetaData(
-        long_name="Height above mean sea level (from input data)",
-        standard_name="height_above_mean_sea_level",
-        units="m",
-    ),
     "frequency": MetaData(
         long_name="Nominal centre frequency of microwave channels",
         standard_name="radiation_frequency",
@@ -173,34 +168,5 @@ ATTRIBUTES_SOURCE = {
         standard_name="convective_available_potential_energy",
         units="J kg-1",
         comment="CAPE is a measure of the amount of energy available for convection",
-    ),
-    "air_temperature_in": MetaData(
-        long_name="Input temperature profile from ",
-        standard_name="air_temperature",
-        units="K",
-    ),
-    "air_pressure_in": MetaData(
-        long_name="Input pressure profile from ",
-        standard_name="air_pressure",
-        units="Pa",
-    ),
-    "absolute_humidity_in": MetaData(
-        long_name="Input absolute humidity profile from ",
-        units="kg m-3",
-    ),
-    "relative_humidity_in": MetaData(
-        long_name="Input relative humidity profile from ",
-        standard_name="relative_humidity",
-        units="1",
-    ),
-    "lwc_in": MetaData(
-        long_name="Liquid water content profile from ",
-        standard_name="atmosphere_cloud_liquid_water_content",
-        units="kg m-3",
-    ),
-    "lwc_pro_in": MetaData(
-        long_name="Liquid water content profile (prognostic) from ",
-        standard_name="atmosphere_cloud_liquid_water_content",
-        units="kg m-3",
     ),
 }
