@@ -1,3 +1,11 @@
+## 0.7.8 – 2025-07-24
+
+- Fix types
+- Fix stability indices
+- Remove input data & make height consistent
+- Update plotting
+- Update lints and workflow
+
 ## 0.7.7 – 2025-07-14
 
 - Improve file structure and add stability indices
