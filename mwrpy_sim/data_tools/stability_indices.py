@@ -36,7 +36,7 @@ def modify_prof_500m(
         td[:, ind_500] = np.mean(td[:, ind_500])
         mr[:, ind_500] = np.mean(mr[:, ind_500])
     else:
-        ind_500 = [0]
+        ind_500 = np.array([0])
     return (
         z[ind_500[-1] :],
         t[:, ind_500[-1] :],
