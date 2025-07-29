@@ -110,12 +110,12 @@ ATTRIBUTES_SOURCE = {
     ),
     "lwc": MetaData(
         long_name="Liquid water content profile interpolated from ",
-        standard_name="atmosphere_cloud_liquid_water_content",
+        standard_name="mass_concentration_of_liquid_water_in_air",
         units="kg m-3",
     ),
     "lwc_pro": MetaData(
         long_name="Liquid water content profile (prognostic) interpolated from ",
-        standard_name="atmosphere_cloud_liquid_water_content",
+        standard_name="mass_concentration_of_liquid_water_in_air",
         units="kg m-3",
     ),
     "lwp": MetaData(
@@ -132,6 +132,18 @@ ATTRIBUTES_SOURCE = {
         long_name="Column-integrated water vapour derived from ",
         standard_name="atmosphere_mass_content_of_water_vapor",
         units="kg m-2",
+    ),
+    "cbh": MetaData(
+        long_name="Height of cloud base above mean sea level derived from ",
+        standard_name="cloud_base_height_above_mean_sea_level",
+        units="m",
+        comment="Cloud base height of the lowest cloud layer",
+    ),
+    "cbh_pro": MetaData(
+        long_name="Height of cloud base above mean sea level (prognostic) derived from ",
+        standard_name="cloud_base_height_above_mean_sea_level",
+        units="m",
+        comment="Cloud base height of the lowest cloud layer",
     ),
     "k_index": MetaData(
         long_name="K-index derived from ",

@@ -106,6 +106,8 @@ def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
 
     with init_file(output_file, dims, sim.data, att) as rootgrp:
         setattr(rootgrp, "source", source)
+        if not "era5" in source:
+            rootgrp.delncattr("era5")
 
 
 def init_file(
@@ -157,6 +159,8 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             "iwv",
             "lwp",
             "lwp_pro",
+            "cbh",
+            "cbh_pro",
             "k_index",
             "ko_index",
             "total_totals_index",

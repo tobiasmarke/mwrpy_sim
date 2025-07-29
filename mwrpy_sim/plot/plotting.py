@@ -42,7 +42,13 @@ def plot_sim_data(
         if data.ndim == 1:
             _plot_histogram(ax, data, meta)
         elif data.ndim == 2:
-            _plot_profile(ax, data, sim_data.variables["height"][:].data)
+            if var_name == "lwc":
+                m_cbh = sim_data.variables["cbh"]
+            elif var_name == "lwc_pro":
+                m_cbh = sim_data.variables["cbh_pro"]
+            else:
+                m_cbh = None
+            _plot_profile(ax, data, sim_data.variables["height"][:].data, m_cbh)
 
         _set_axis(ax, meta)
 
@@ -97,7 +103,7 @@ def _handle_saving(
 def _set_axis(ax, meta: PlotMeta) -> None:
     """Sets axis range and labels defined in PlotMeta."""
     pos = ax.get_position()
-    y_label = "Height (m)" if meta.source == "profile" else "Log frequency"
+    y_label = "Height amsl (m)" if meta.source == "profile" else "Log frequency"
     if pos.x0 < 0.1:
         ax.set_ylabel(y_label)
     elif pos.x1 > 0.1 and meta.source == "profile":
@@ -149,7 +155,9 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
     )
 
 
-def _plot_profile(ax, data: np.ndarray, height: np.ndarray) -> None:
+def _plot_profile(
+    ax, data: np.ndarray, height: np.ndarray, m_cbh: netCDF4.Variable | None
+) -> None:
     """Plots a mean profile and stdev of the data."""
     ax.fill_betweenx(
         height,
@@ -164,3 +172,12 @@ def _plot_profile(ax, data: np.ndarray, height: np.ndarray) -> None:
         color="black",
         linewidth=1.0,
     )
+    if m_cbh is not None:
+        ax.text(
+            0.05,
+            0.85,
+            f"mean CBH: {np.ma.mean(m_cbh[:]):.2f} m",
+            transform=ax.transAxes,
+            fontsize=12,
+            verticalalignment="top",
+        )
