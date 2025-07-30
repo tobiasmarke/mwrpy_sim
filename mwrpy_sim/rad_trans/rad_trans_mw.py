@@ -386,8 +386,8 @@ def ray_tracing(
             dtaua = np.abs(tau - taul)
             ds[i] = np.dot(ds[i], (dtaua / (np.dot(2.0, np.sin(np.dot(dtaua, 0.5))))))
         # Make upper boundary into lower boundary for next layer.
-        phil = np.copy(phi)
-        taul = np.copy(tau)
+        phil = float(np.copy(phi))
+        taul = float(np.copy(tau))
         rl = np.copy(r)
         tanthl = np.copy(tanth)
 

@@ -112,35 +112,13 @@ def prepare_vaisala(vs_data: nc.Dataset, altitude: float) -> dict:
 
 
 def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
-    sa = nc.Dataset(
-        os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        + "/tests/data/standard_atmospheres.nc"
-    )
-    ind_sa = np.where(sa.variables["height"][:] > 20.0)[0]
-    rh = q2rh(
-        sa.variables["q_atmo"][ind_sa, 0] * 1000.0,
-        sa.variables["t_atmo"][ind_sa, 0],
-        sa.variables["p_atmo"][ind_sa, 0] * 100.0,
-    )
-
     input_icon = {
-        "height": np.append(
-            np.flip(icon_data["height_2"][:]) - icon_data["height_2"][-1],
-            sa.variables["height"][ind_sa] * 1000.0,
-        ),
-        "air_temperature": np.append(
-            np.flip(icon_data["T"][index, :]), sa.variables["t_atmo"][ind_sa, 0]
-        ),
-        "air_pressure": np.append(
-            np.flip(icon_data["P"][index, :]), sa.variables["p_atmo"][ind_sa, 0] * 100.0
-        ),
-        "relative_humidity": np.append(
-            np.flip(icon_data["REL_HUM"][index, :]) / 100.0, rh
-        ),
+        "height": np.flip(icon_data["height_2"][:]) - icon_data["height_2"][-1],
+        "air_temperature": np.flip(icon_data["T"][index, :]),
+        "air_pressure": np.flip(icon_data["P"][index, :]),
+        "relative_humidity": np.flip(icon_data["REL_HUM"][index, :]) / 100.0,
     }
-    input_icon["lwc"] = np.append(
-        np.flip(icon_data["QC"][index, :]), np.zeros(len(ind_sa))
-    ) * moist_rho_rh(
+    input_icon["lwc_in"] = np.flip(icon_data["QC"][index, :]) * moist_rho_rh(
         input_icon["air_pressure"],
         input_icon["air_temperature"],
         input_icon["relative_humidity"],
