@@ -6,27 +6,41 @@ from mwrpy_sim.utils import GAUSS, exponential_integration, read_config
 
 
 def calc_mw_rt(
-    # [m] states grid of T_final [K], p_final [hPa], q_final [gm^-3]
     z_final,
     T_final,
     p_final,
     q_final,
     LWC,
-    theta,  # zenith angle of observation in deg.
-    f,  # frequency vector in GHz
+    theta,
+    f,
     coeff_bdw: dict,
     ape_ang: np.ndarray,
-):
-    """Non-scattering microwave radiative transfer."""
+) -> np.ndarray:
+    """Non-scattering microwave radiative transfer.
+
+    Args:
+        z_final: Height profile (km).
+        T_final: Temperature profile (K).
+        p_final: Pressure profile (hPa).
+        q_final: Water vapor density profile (g/m^3).
+        LWC: Liquid water content profile (g/m^3).
+        theta: Zenith angle of observation (degrees).
+        f: Frequency vector (GHz).
+        coeff_bdw: Coefficients for bandwidth/beamwidth correction.
+        ape_ang: Array of antenna aperture angles (degrees).
+
+    Returns:
+        TB: Brightness temperatures for each frequency (K).
+    """
     config = read_config(None, "global_specs")
     if (
-        config["cloud"].split()[-1] == "excluded"
+        config["clouds"]
         and np.sum((LWC[1:] + LWC[:-1]) / 2.0 * np.diff(z_final)) > 0.001
         or np.any(np.ma.array(T_final).mask)
     ):
         return np.ones(len(f), np.float32) * -999.0
 
-    if config["corr"].split()[0] == "Without":
+    if not config["corrections"]:
         # No bandwidth/beamwidth correction
         tau = np.array(
             [
@@ -83,7 +97,7 @@ def calc_mw_rt(
 
         ape_wgh = GAUSS(ape_ang + theta, theta)
         ape_wgh = ape_wgh / np.sum(ape_wgh)
-        ape_0 = ape_wgh[0] if "beamwidth" in config["corr"] else 1.0
+        ape_0 = ape_wgh[0] if "beamwidth" in config["corrections"] else 1.0
         TB = np.empty(len(f), np.float32)
         TB_k = TB_CALC(f[:7], T_final, tau_k) * ape_0
         for ff in range(7):
@@ -103,7 +117,7 @@ def calc_mw_rt(
                 )
                 * ape_0
             )
-            if "beamwidth" in config["corr"]:
+            if "beamwidth" in config["corrections"]:
                 for ia, _ in enumerate(ape_ang[1:]):
                     if ff == 0:
                         # K-band calculations
@@ -143,7 +157,7 @@ def calc_mw_rt(
                         )
                     )
             TB[ff + 7] = np.sum(TB_v)
-        TB[:7] = np.sum(TB_k, axis=0) if "beamwidth" in config["corr"] else TB_k
+        TB[:7] = np.sum(TB_k, axis=0) if "beamwidth" in config["corrections"] else TB_k
 
     return TB
 
@@ -164,8 +178,8 @@ def TAU_CALC(
         z: Height profile (km above observation height).
         T: Temperature profile (K).
         p: Pressure profile (hPa).
-        rhow: Water vapor density profile (g/m^3).
-        LWC: Liquid water content profile (g/m^3).
+        rhow: Water vapor density profile (kg/m^3).
+        LWC: Liquid water content profile (kg/m^3).
         f: Frequency in GHz.
         config: Configuration dictionary.
         theta: Zenith angle of observation in degrees.
@@ -173,7 +187,11 @@ def TAU_CALC(
     Returns:
         tau: Optical thickness profile (tau).
     """
-    model = config["model"]
+    model = config["mw_model"]
+    if model not in ["R22", "R24"]:
+        raise ValueError(
+            f"Microwave model '{model}' is not supported. Use 'R22' or 'R24'."
+        )
     abs_wv = np.array(
         [
             eval(f"calc_absorption.ABWV_{model}")(rhow[ii], TT, p[ii], f) / 1000.0
@@ -204,7 +222,12 @@ def TAU_CALC(
     )
 
     if not np.isclose(theta, 0.0, 1.0):
-        method = config["refrac"]
+        method = config["refractivity"]
+        if method not in ["Rueeger2002", "Thayer1974"]:
+            raise ValueError(
+                f"Refractivity method '{method}' is not supported. "
+                "Use 'Rueeger2002' or 'Thayer1974'."
+            )
         mu = eval(f"refractivity_{method}")(p, T, rhow)
         deltaz = ray_tracing(z, mu, 90.0 - theta, z[0])
     else:

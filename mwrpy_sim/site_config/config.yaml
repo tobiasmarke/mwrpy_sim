@@ -2,7 +2,6 @@
 
 params:
   elevation_angle: [90.]
-
   frequency:
     [
       22.240,
@@ -20,7 +19,7 @@ params:
       57.300,
       58.00,
     ]
-
+  wavelength: [10.5, 11.1, 12.0]
   height:
     [
       0.0000000,
@@ -77,9 +76,9 @@ params:
   lon_offset: [-0.1, 0.1] # corners of box relative to station within which to get model data for mean and std
 
 global_specs:
-  title:
-  model: R24
-  corr: Without bandwidth correction
-  refrac: Rueeger2002
-  cloud: Cloudy cases excluded
+  mw_model: R24
+  corrections:
+  refractivity: Rueeger2002
+  clouds: True
+  calc_ir: True
   era5: pressure
