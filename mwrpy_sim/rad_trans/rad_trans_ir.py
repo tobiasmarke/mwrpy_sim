@@ -15,7 +15,7 @@ def calc_ir_rt(
     base: np.ndarray,
     top: np.ndarray,
     params: dict,
-    reff: float = 6.5,
+    reff: float = 9.0,
 ) -> np.ndarray:
     """Calculate IR radiative transfer.
     LNFL, LBLRTM, and LBLDIS are maintained by the Radiation and Climate Group
@@ -67,7 +67,11 @@ def calc_ir_rt(
         for i in range(len(base)):
             b_i = np.where(input_dat["height"][:] == base[i])[0][0]
             t_i = np.where(input_dat["height"][:] == top[i])[0][0]
-            lwp = np.sum(lwc[b_i:t_i] * np.diff(input_dat["height"][b_i : t_i + 1]))
+            height_hl = (
+                input_dat["height"][b_i - 1 : t_i + 1]
+                + input_dat["height"][b_i : t_i + 2]
+            ) / 2.0
+            lwp = np.sum(lwc[b_i : t_i + 1] * np.diff(height_hl))
             tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff * 1e-6)
 
     # Make parameter file for LBLDIS
