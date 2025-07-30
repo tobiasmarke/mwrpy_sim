@@ -91,13 +91,13 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     """
     # Calculate additional variables
     mix_rat = mixr(
-        data_dict["air_temperature"][:, :],
-        data_dict["absolute_humidity"][:, :],
+        np.squeeze(data_dict["air_temperature"][:, :]),
+        np.squeeze(data_dict["absolute_humidity"][:, :]),
         data_dict["air_pressure"][:, 0],
         height,
     )
     eq_pot_t = eq_pot_tem(
-        data_dict["air_temperature"][:, :],
+        np.squeeze(data_dict["air_temperature"][:, :]),
         mix_rat,
         data_dict["air_pressure"][:, 0],
         height,
@@ -105,12 +105,13 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     t_dew = t_dew_rh(
         data_dict["air_temperature"][:, :], data_dict["relative_humidity"][:, :]
     )
+    # Modify profiles below 500 m
     z_mod, t_mod, p_mod, td_mod, mr_mod = modify_prof_500m(
         np.array(height),
         data_dict["air_temperature"][:, :],
         data_dict["air_pressure"][:, :],
         t_dew[:, :],
-        mix_rat[:, :],
+        mix_rat[:],
     )
     mixed_prof = mpcalc.parcel_profile(
         p_mod[0, :] * units.Pa, t_mod[0, 0] * units.K, units.Quantity(td_mod[0, 0], "K")
@@ -177,11 +178,13 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
 
     # Calculate convective available potential energy (CAPE)
     data_dict["cape"] = np.expand_dims(
-        mpcalc.cape_cin(
-            p_mod[0, :] * units.Pa,
-            t_mod[0, :] * units.K,
-            units.Quantity(td_mod[0, :], "K"),
-            mixed_prof,
-        )[0].magnitude,
+        float(
+            mpcalc.cape_cin(
+                p_mod[0, :] * units.Pa,
+                t_mod[0, :] * units.K,
+                units.Quantity(td_mod[0, :], "K"),
+                mixed_prof,
+            )[0].magnitude
+        ),
         0,
     )
