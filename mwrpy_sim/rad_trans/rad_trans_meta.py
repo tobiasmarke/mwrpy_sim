@@ -65,6 +65,11 @@ ATTRIBUTES_COM = {
         standard_name="radiation_frequency",
         units="GHz",
     ),
+    "wavelength": MetaData(
+        long_name="Nominal centre wavelength of infrared channels",
+        standard_name="radiation_wavelength",
+        units="µm",
+    ),
     "elevation_angle": MetaData(
         long_name="Sensor elevation angle",
         units="degree",
@@ -86,6 +91,21 @@ ATTRIBUTES_SOURCE = {
     ),
     "tb_clr": MetaData(
         long_name="Microwave brightness temperature (no liquid water) simulated from ",
+        standard_name="brightness_temperature",
+        units="K",
+    ),
+    "irt": MetaData(
+        long_name="Infrared brightness temperature simulated from ",
+        standard_name="brightness_temperature",
+        units="K",
+    ),
+    "irt_pro": MetaData(
+        long_name="Infrared brightness temperature (prognostic) simulated from ",
+        standard_name="brightness_temperature",
+        units="K",
+    ),
+    "irt_clr": MetaData(
+        long_name="Infrared brightness temperature (no liquid water) simulated from ",
         standard_name="brightness_temperature",
         units="K",
     ),
