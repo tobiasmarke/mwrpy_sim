@@ -13,6 +13,7 @@ from mwrpy_sim.atmos import (
     calc_rho,
     era5_geopot,
     hum_to_iwv,
+    mixr,
     moist_rho_rh,
     q2rh,
 )
@@ -228,6 +229,12 @@ def _add_vars(input_dat) -> dict:
         )
     input_dat["e"] = calc_rho(
         input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
+    )
+    input_dat["mixr"] = mixr(
+        input_dat["air_temperature"][:],
+        input_dat["absolute_humidity"][:],
+        input_dat["air_pressure"][0],
+        input_dat["height"][:],
     )
     if "iwv" not in input_dat:
         input_dat["iwv"] = (

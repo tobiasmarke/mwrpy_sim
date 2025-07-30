@@ -280,6 +280,7 @@ def process_input(
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
     data_nc["frequency"] = np.array(params["frequency"])
+    data_nc["wavelength"] = np.array(params["wavelength"])
     data_nc["elevation_angle"] = np.array(params["elevation_angle"])
 
     return data_nc

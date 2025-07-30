@@ -6,7 +6,8 @@ from mwrpy_sim.data_tools.cloud_mod import (
     get_cloud_prop,
 )
 from mwrpy_sim.data_tools.stability_indices import calc_stability_indices
-from mwrpy_sim.rad_trans import calc_mw_rt
+from mwrpy_sim.rad_trans import calc_ir_rt, calc_mw_rt
+from mwrpy_sim.utils import read_config
 
 
 def rad_trans(
@@ -18,14 +19,16 @@ def rad_trans(
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = -999.0
     theta = 90.0 - np.array(params["elevation_angle"])
-    tb = np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
-    tb_pro = np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
-    tb_clr = np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
-    lwp, lwp_pro = FillValue, FillValue
-    lwc, lwc_pro = (
-        np.zeros(len(input_dat["height"][:]), np.float32),
-        np.zeros(len(input_dat["height"][:]), np.float32),
+    tb, tb_pro, tb_clr = (
+        np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
+        for _ in range(3)
     )
+    irt, irt_pro, irt_clr = (
+        np.ones((1, len(params["wavelength"]), len(theta)), np.float32) * FillValue
+        for _ in range(3)
+    )
+    lwc, lwc_pro = (np.zeros(len(input_dat["height"][:]), np.float32) for _ in range(2))
+    base, top, lwp, lwp_pro = np.empty(0), np.empty(0), FillValue, FillValue
 
     # Cloud geometry [m] / cloud water content (LWC, LWP)
     cloud_methods = (
@@ -57,11 +60,11 @@ def rad_trans(
 
         # Avoid extra "clear" RT calculation for cases without liquid water
         if method == "clear" and lwp == 0.0:
-            tb_clr = np.copy(tb)
+            tb_clr, irt_clr = np.copy(tb), np.copy(irt)
         elif method == "clear" and lwp_pro == 0.0:
-            tb_clr = np.copy(tb_pro)
+            tb_clr, irt_clr = np.copy(tb_pro), np.copy(irt_pro)
         else:
-            # Radiative transport
+            # MW radiative transport
             tb_tmp = np.array(
                 [
                     calc_mw_rt(
@@ -79,12 +82,22 @@ def rad_trans(
                 ],
                 np.float32,
             ).T
+
+            # IR radiative transport
+            config = read_config(None, "global_specs")
+            irt_tmp = (
+                calc_ir_rt(input_dat, lwc_tmp, base, top, params)
+                if config["calc_ir"]
+                else np.ones((1, len(params["wavelength"]), len(theta)), np.float32)
+                * FillValue
+            )
+
             if method == "prognostic":
-                lwp_pro, tb_pro, lwc_pro = lwp_tmp, tb_tmp, lwc_tmp
+                lwp_pro, tb_pro, lwc_pro, irt_pro = lwp_tmp, tb_tmp, lwc_tmp, irt_tmp
             elif method == "detected":
-                lwp, tb, lwc = lwp_tmp, tb_tmp, lwc_tmp
+                lwp, tb, lwc, irt = lwp_tmp, tb_tmp, lwc_tmp, irt_tmp
             else:
-                tb_clr = tb_tmp
+                tb_clr, irt_clr = tb_tmp, irt_tmp
 
     # Interpolate to final grid
     pressure_int = np.interp(
@@ -123,6 +136,9 @@ def rad_trans(
         "tb": np.expand_dims(tb, 0),
         "tb_pro": np.expand_dims(tb_pro, 0),
         "tb_clr": np.expand_dims(tb_clr, 0),
+        "irt": np.expand_dims(irt, 0),
+        "irt_pro": np.expand_dims(irt_pro, 0),
+        "irt_clr": np.expand_dims(irt_clr, 0),
         "air_temperature": np.expand_dims(temperature_int, 0),
         "air_pressure": np.expand_dims(pressure_int, 0),
         "absolute_humidity": np.expand_dims(abshum_int, 0),
