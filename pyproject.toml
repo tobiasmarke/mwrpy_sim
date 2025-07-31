@@ -51,8 +51,8 @@ module = [
   "pandas.*",
   "pylblrtm.*",
   "pysonde.*",
-  "suncalc.*",
   "scipy.*",
+  "suncalc.*",
 ]
 ignore_missing_imports = true
 
