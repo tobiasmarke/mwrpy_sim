@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import os
+import subprocess
 
 import numpy as np
 import suncalc
@@ -27,7 +28,7 @@ def calc_ir_rt(
         base: Base heights of cloud layers (m).
         top: Top heights of cloud layers (m).
         params: Dictionary containing simulation parameters.
-        reff: Effective radius of cloud droplets (µm) (default is 6.5 µm).
+        reff: Effective radius of cloud droplets (µm) (default is 9 µm).
     Output:
         IR brightness temperatures for 3 IRT channels.
     """
@@ -54,12 +55,19 @@ def calc_ir_rt(
         )
 
     # Run LNFL to create TAPE3 file for LBLRTM
-    os.system(f"lnfl {tape_out}TAPE1 TAPE5 >/dev/null 2>&1")
+    subprocess.run(
+        ["lnfl", f"{tape_out}TAPE1", "TAPE5"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=True,
+    )
 
     # Run LBLRTM to create OD files for gaseous absorbers
-    os.system(f"lblrtm >/dev/null 2>&1")
-    os.system(f"mv TAPE* {tape_out}")
-    os.system(f"mv ODdeflt* {tape_out}")
+    subprocess.run(
+        ["lblrtm"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+    )
+    subprocess.call(f"mv TAPE* {tape_out}", shell=True)
+    subprocess.call(f"mv ODdeflt* {tape_out}", shell=True)
 
     # Calculate tau
     tau = np.zeros(len(base), np.float32)
@@ -80,7 +88,11 @@ def calc_ir_rt(
     )
 
     # Run LBLDIS
-    os.system(f"lbldis {tape_out}lbldis.param 0 {tape_out}lbldisout >/dev/null 2>&1")
+    subprocess.run(
+        ["lbldis", f"{tape_out}lbldis.param", "0", f"{tape_out}lbldisout"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
     # Read the output file
     with open(f"{tape_out}lbldisout", "rb") as f:
@@ -169,7 +181,7 @@ def irspectrum2irt(
     wavenumber: np.ndarray,
 ) -> np.ndarray:
     """Convert IR spectrum to broadband IRT."""
-    # Load spetral response function
+    # Load spectral response function
     path = os.path.dirname(os.path.realpath(__file__)) + "/coeff/irt_srf.json"
     srf = loadCoeffsJSON(path)
 
