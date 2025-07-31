@@ -53,14 +53,13 @@ def detect_liq_cloud(z, t, rh, p_rs):
         z_top: array of cloud tops
         z_base: array of cloud bases
     """
-    alpha = 0.59
-    beta = 1.37
-    sigma = p_rs / p_rs[0]
-    rh_thres = 1.0 - alpha * sigma * (1.0 - sigma) * (1.0 + beta * (sigma - 0.5))
-    # rh_thres = 0.95  # 1
+    # alpha = 0.59
+    # beta = 1.37
+    # sigma = p_rs / p_rs[0]
+    # rh_thres = 1.0 - alpha * sigma * (1.0 - sigma) * (1.0 + beta * (sigma - 0.5))
+    rh_thres = 0.95  # 1
     t_thres = 253.15  # K
     # ***determine cloud boundaries
-    # --> layers where mean rh GT rh_thres
 
     i_cloud, i_top, i_base = (
         np.array(np.where((rh > rh_thres) & (t > t_thres))[0], dtype=np.int32),

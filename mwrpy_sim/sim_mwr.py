@@ -100,12 +100,15 @@ def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
     dims = {
         "time": len(sim.data["time"].data),
         "frequency": len(sim.data["frequency"].data),
+        "wavelength": len(sim.data["wavelength"].data),
         "height": len(sim.data["height"].data),
         "elevation_angle": len(sim.data["elevation_angle"].data),
     }
 
     with init_file(output_file, dims, sim.data, att) as rootgrp:
         setattr(rootgrp, "source", source)
+        if not "era5" in source:
+            rootgrp.delncattr("era5")
 
 
 def init_file(
@@ -157,6 +160,8 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             "iwv",
             "lwp",
             "lwp_pro",
+            "cbh",
+            "cbh_pro",
             "k_index",
             "ko_index",
             "total_totals_index",
@@ -167,6 +172,8 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             size = "time"
         if obj.name in ("tb", "tb_pro", "tb_clr"):
             size = ("time", "frequency", "elevation_angle")
+        if obj.name in ("irt", "irt_pro", "irt_clr"):
+            size = ("time", "wavelength", "elevation_angle")
         if obj.name in (
             "air_temperature",
             "absolute_humidity",
@@ -192,4 +199,6 @@ def _add_standard_global_attributes(nc_file: netCDF4.Dataset, att_global) -> Non
     for name, value in att_global.items():
         if value is None:
             value = ""
+        if isinstance(value, (int, float, bool)):
+            value = str(value)
         setattr(nc_file, name, value)

@@ -44,11 +44,11 @@ def calc_p_baro(
     e = vap_pres(a, T)
     q = con.MW_RATIO * e / (np.broadcast_to(p, e.T.shape).T - 0.378 * e)
     Tv = T * (1 + 0.608 * q)
-    Tv_half = (Tv[:, :-1] + Tv[:, 1:]) / 2
+    Tv_half = (Tv[:-1] + Tv[1:]) / 2
     dz = np.diff(z)
     dp = np.ma.exp(-con.g0 * dz / (con.RS * Tv_half))
-    tmp = np.insert(dp, 0, p, axis=1)
-    p_baro = np.cumprod(tmp, axis=1)
+    tmp = np.insert(dp, 0, p, axis=0)
+    p_baro = np.cumprod(tmp, axis=0)
     return p_baro
 
 
@@ -117,7 +117,7 @@ def t_dew_rh(T: np.ndarray, rh: np.ndarray) -> np.ndarray:
 
 
 def mixr(T: np.ndarray, q: np.ndarray, p: np.ndarray, z: np.ndarray) -> np.ndarray:
-    """Equivalent potential temperature (K)."""
+    """Mixing ratio (kg/kg)."""
     e = vap_pres(q, T)
     p_baro = calc_p_baro(T, q, p, z)
     return con.MW_RATIO * e / (p_baro - e)
