@@ -1,6 +1,8 @@
 # MWRpy_sim
 
-Repository for Simulating Microwave Radiometer Brightness Temperatures
+Repository for Simulating Microwave Radiometer and Infrared Brightness Temperatures
+
+Note: The code and data files for IR radiative transfer calculations are not included in this repository.
 
 ## Installation
 
@@ -21,7 +23,17 @@ MWRpy_sim requires Python 3.10 or newer.
 
 The folder `mwrpy_sim/site_config/` contains site-specific configuration files,
 defining the input and output data paths etc., and the file `config.yaml`, which
-defines the elevation angles, frequencies and height grid.
+defines the elevation angles, frequencies/wavelengths and height grid. In addition,
+the following global specifications can be set:
+
+| global_specs   | Options                     | Description                                  |
+| :------------- | :-------------------------- | :------------------------------------------- |
+| `mw_model`     | `R22`, `R24`                | Model for absorption calculations.           |
+| `corrections`  | `bandwidth`, `beamwidth`    | Corrections for MWR characteristics.         |
+| `refractivity` | `Rueeger2002`, `Thayer1974` | Model for refractivity corrections.          |
+| `clouds`       | `True`, `False`             | Include (True) or skip (False) cloudy cases. |
+| `calc_ir`      | `True`, `False`             | Calculate IR brightness temperatures.        |
+| `era5`         | `pressure`, `model`         | ERA5 data source.                            |
 
 ## Command line usage
 

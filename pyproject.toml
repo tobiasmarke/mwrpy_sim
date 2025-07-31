@@ -22,6 +22,7 @@ dependencies = [
   "pandas",
   "pysonde",
   "scipy",
+  "suncalc",
 ]
 dynamic = ["version"]
 
@@ -41,7 +42,19 @@ Changelog = "https://github.com/tobiasmarke/mwrpy_sim/blob/main/CHANGELOG.md"
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["cdsapi.*", "matplotlib.*", "metpy.*", "netCDF4.*", "numpy.*", "pandas.*", "pysonde.*", "scipy.*"]
+module = [
+  "cdsapi.*",
+  "matplotlib.*",
+  "metpy.*",
+  "netCDF4.*",
+  "numpy.*",
+  "pandas.*",
+  "pylblrtm.*",
+  "pysonde.*",
+  "scipy.*",
+  "suncalc.*",
+  "yaml.*",
+]
 ignore_missing_imports = true
 
 [tool.release-version]
