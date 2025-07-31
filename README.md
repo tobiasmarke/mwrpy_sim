@@ -2,7 +2,7 @@
 
 Repository for Simulating Microwave Radiometer and Infrared Brightness Temperatures
 
-Note: The code for IR radiative transfer calculations is not included in this repository.
+Note: The code and data files for IR radiative transfer calculations are not included in this repository.
 
 ## Installation
 

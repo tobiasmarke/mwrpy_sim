@@ -80,5 +80,5 @@ global_specs:
   corrections:
   refractivity: Rueeger2002
   clouds: True
-  calc_ir: True
+  calc_ir: False
   era5: pressure

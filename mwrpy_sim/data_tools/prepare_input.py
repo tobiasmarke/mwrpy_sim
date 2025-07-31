@@ -77,7 +77,7 @@ def prepare_era5_mod(
         mxr,
     )
     input_era5["lwc_in"] = clwc * rho.magnitude
-    input_era5["time"] = seconds_since_epoch(date_i)
+    input_era5["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
 
     return _add_std_atm(input_era5)
 
@@ -108,7 +108,7 @@ def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
         mxr,
     )
     input_era5["lwc_in"] = clwc * rho.magnitude
-    input_era5["time"] = seconds_since_epoch(date_i)
+    input_era5["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
 
     return _add_std_atm(input_era5)
 
@@ -122,7 +122,9 @@ def prepare_radiosonde(rs_data: nc.Dataset) -> dict:
     input_rs["air_temperature"] = rs_data["air_temperature"][:] + con.T0
     input_rs["relative_humidity"] = rs_data["relative_humidity"][:] / 100.0
     input_rs["air_pressure"] = rs_data["air_pressure"][:] * 100.0
-    input_rs["time"] = seconds_since_epoch(rs_data.BEZUGSDATUM_SYNOP)
+    input_rs["time"] = np.array(
+        seconds_since_epoch(rs_data.BEZUGSDATUM_SYNOP), dtype=np.int64
+    )
 
     return _add_std_atm(input_rs)
 
@@ -136,8 +138,11 @@ def prepare_vaisala(vs_data: nc.Dataset, altitude: float) -> dict:
     input_vs["air_temperature"] = vs_data.variables["ta"][0, :]
     input_vs["air_pressure"] = vs_data.variables["p"][0, :]
     input_vs["relative_humidity"] = vs_data["rh"][0, :] / 100.0
-    input_vs["time"] = seconds_since_epoch(
-        vs_data.date_YYYYMMDDTHHMM[0:8] + vs_data.date_YYYYMMDDTHHMM[9:11]
+    input_vs["time"] = np.array(
+        seconds_since_epoch(
+            vs_data.date_YYYYMMDDTHHMM[0:8] + vs_data.date_YYYYMMDDTHHMM[9:11]
+        ),
+        dtype=np.int64,
     )
 
     return _add_std_atm(input_vs)
@@ -156,7 +161,7 @@ def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
         input_icon["air_temperature"],
         input_icon["relative_humidity"],
     )
-    input_icon["time"] = seconds_since_epoch(date_i)
+    input_icon["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
     input_icon["iwv"] = icon_data["TQV"][index]
 
     return _add_std_atm(input_icon)

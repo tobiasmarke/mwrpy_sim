@@ -75,7 +75,9 @@ def calc_ir_rt(
             tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff * 1e-6)
 
     # Make parameter file for LBLDIS
-    make_lbldis_file(params, 650, 1150, input_dat["time"], base / 1000.0, tau, reff)
+    make_lbldis_file(
+        params, 650, 1150, int(input_dat["time"]), base / 1000.0, tau, reff
+    )
 
     # Run LBLDIS
     os.system(f"lbldis {tape_out}lbldis.param 0 {tape_out}lbldisout >/dev/null 2>&1")

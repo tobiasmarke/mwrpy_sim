@@ -34,7 +34,7 @@ def calc_mw_rt(
     """
     config = read_config(None, "global_specs")
     if (
-        config["clouds"]
+        not config["clouds"]
         and np.sum((LWC[1:] + LWC[:-1]) / 2.0 * np.diff(z_final)) > 0.001
         or np.any(np.ma.array(T_final).mask)
     ):

@@ -34,7 +34,7 @@ def modify_prof_500m(
         t[:, ind_500] = np.mean(t[:, ind_500])
         p[:, ind_500] = np.mean(p[:, ind_500])
         td[:, ind_500] = np.mean(td[:, ind_500])
-        mr[:, ind_500] = np.mean(mr[:, ind_500])
+        mr[ind_500] = np.mean(mr[ind_500])
     else:
         ind_500 = np.array([0])
     return (
@@ -42,7 +42,7 @@ def modify_prof_500m(
         t[:, ind_500[-1] :],
         p[:, ind_500[-1] :],
         td[:, ind_500[-1] :],
-        mr[:, ind_500[-1] :],
+        mr[ind_500[-1] :],
     )
 
 
@@ -134,10 +134,10 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     else:
         data_dict["ko_index"] = np.expand_dims(
             ko_index(
-                eq_pot_t[:, p_ind(700, data_dict["air_pressure"])],
-                eq_pot_t[:, p_ind(500, data_dict["air_pressure"])],
-                eq_pot_t[:, p_ind(1000, data_dict["air_pressure"])],
-                eq_pot_t[:, p_ind(850, data_dict["air_pressure"])],
+                eq_pot_t[p_ind(700, data_dict["air_pressure"])],
+                eq_pot_t[p_ind(500, data_dict["air_pressure"])],
+                eq_pot_t[p_ind(1000, data_dict["air_pressure"])],
+                eq_pot_t[p_ind(850, data_dict["air_pressure"])],
             ),
             0,
         )

@@ -41,7 +41,7 @@ def rad_trans(
             lwc_tmp, lwp_tmp, base_tmp, top = (
                 np.zeros(len(input_dat["height"][:]), np.float32),
                 0.0,
-                np.empty(0),
+                np.empty(0, np.float32),
                 np.ones(1, np.float32) * FillValue,
             )
         else:
@@ -96,8 +96,7 @@ def rad_trans(
                 else np.ones((1, len(params["wavelength"]), len(theta)), np.float32)
                 * FillValue
             )
-            if len(base_tmp) == 0:
-                base_tmp = np.ones(1, np.float32) * FillValue
+            base_new = base_tmp[0] if len(base_tmp) > 0 else FillValue
 
             if method == "prognostic":
                 lwp_pro, tb_pro, lwc_pro, irt_pro, base_pro = (
@@ -105,10 +104,10 @@ def rad_trans(
                     tb_tmp,
                     lwc_tmp,
                     irt_tmp,
-                    base_tmp[0],
+                    base_new,
                 )
             elif method == "detected":
-                lwp, tb, lwc, irt, base = lwp_tmp, tb_tmp, lwc_tmp, irt_tmp, base_tmp[0]
+                lwp, tb, lwc, irt, base = lwp_tmp, tb_tmp, lwc_tmp, irt_tmp, base_new
             else:
                 tb_clr, irt_clr = tb_tmp, irt_tmp
 
@@ -134,6 +133,8 @@ def rad_trans(
         "air_temperature",
         "absolute_humidity",
         "relative_humidity",
+        "lwc",
+        "lwc_pro",
     ]
     for var in var_names:
         if var in input_dat:

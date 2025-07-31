@@ -53,6 +53,7 @@ module = [
   "pysonde.*",
   "scipy.*",
   "suncalc.*",
+  "yaml.*",
 ]
 ignore_missing_imports = true
 
