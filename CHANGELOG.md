@@ -1,3 +1,11 @@
+## 0.8.0 – 2025-07-31
+
+- Improve IR tau liquid
+- Update readme / workflow / config
+- Add IR radiative transfer
+- Fix stability index calculation
+- Add cloud base height and change cloud detection to fixed RH threshold
+
 ## 0.7.8 – 2025-07-24
 
 - Fix types
