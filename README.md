@@ -1,4 +1,5 @@
-# MWRpy_sim
+<img width="311" height="172" alt="mwrpy_sim_logo" src="https://github.com/user-attachments/assets/c33605c3-3447-4624-820e-bd51e30d5a87" />
+
 
 Repository for Simulating Microwave Radiometer and Infrared Brightness Temperatures
 
