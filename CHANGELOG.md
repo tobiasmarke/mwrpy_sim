@@ -1,3 +1,7 @@
+## 0.8.1 – 2025-08-01
+
+- Patch output array and plot
+
 ## 0.8.0 – 2025-07-31
 
 - Improve IR tau liquid
