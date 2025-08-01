@@ -130,7 +130,7 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     # Calculate ko index
     p_levs = [700, 500, 1000, 850]
     if not all(p_ind(p, data_dict["air_pressure"]) for p in p_levs):
-        data_dict["ko_index"] = np.full((1, 1), -999.0)
+        data_dict["ko_index"] = np.full((1,), -999.0)
     else:
         data_dict["ko_index"] = np.expand_dims(
             ko_index(
@@ -153,25 +153,19 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> None:
     )
 
     # Calculate lifted index
-    data_dict["lifted_index"] = np.expand_dims(
-        mpcalc.lifted_index(
-            p_mod[0, :] * units.Pa,
-            t_mod[0, :] * units.K,
-            mixed_prof,
-        ).magnitude,
-        0,
-    )
+    data_dict["lifted_index"] = mpcalc.lifted_index(
+        p_mod[0, :] * units.Pa,
+        t_mod[0, :] * units.K,
+        mixed_prof,
+    ).magnitude
 
     # Calculate showalter index
     try:
-        data_dict["showalter_index"] = np.expand_dims(
-            mpcalc.showalter_index(
-                data_dict["air_pressure"][0, :] * units.Pa,
-                data_dict["air_temperature"][0, :] * units.K,
-                units.Quantity(t_dew[0, :], "K"),
-            ).magnitude,
-            0,
-        )
+        data_dict["showalter_index"] = mpcalc.showalter_index(
+            data_dict["air_pressure"][0, :] * units.Pa,
+            data_dict["air_temperature"][0, :] * units.K,
+            units.Quantity(t_dew[0, :], "K"),
+        ).magnitude
     except TypeError:
         # Handle case where showalter_index cannot be calculated
         data_dict["showalter_index"] = np.full((1,), -999.0)

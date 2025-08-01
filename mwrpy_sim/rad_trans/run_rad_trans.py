@@ -27,7 +27,6 @@ def rad_trans(
         np.ones((1, len(params["wavelength"]), len(theta)), np.float32) * FillValue
         for _ in range(3)
     )
-    lwc, lwc_pro = (np.zeros(len(input_dat["height"][:]), np.float32) for _ in range(2))
     lwp, lwp_pro, base, base_pro = (FillValue for _ in range(4))
 
     # Cloud geometry [m] / cloud water content (LWC, LWP)
@@ -93,13 +92,13 @@ def rad_trans(
             irt_tmp = (
                 calc_ir_rt(input_dat, lwc_tmp, base_tmp, top, params)
                 if config["calc_ir"]
-                else np.ones((1, len(params["wavelength"]), len(theta)), np.float32)
+                else np.ones((len(params["wavelength"]), len(theta)), np.float32)
                 * FillValue
             )
             base_new = base_tmp[0] if len(base_tmp) > 0 else FillValue
 
             if method == "prognostic":
-                lwp_pro, tb_pro, lwc_pro, irt_pro, base_pro = (
+                lwp_pro, tb_pro, input_dat["lwc_pro"], irt_pro, base_pro = (
                     lwp_tmp,
                     tb_tmp,
                     lwc_tmp,
@@ -107,7 +106,13 @@ def rad_trans(
                     base_new,
                 )
             elif method == "detected":
-                lwp, tb, lwc, irt, base = lwp_tmp, tb_tmp, lwc_tmp, irt_tmp, base_new
+                lwp, tb, input_dat["lwc"], irt, base = (
+                    lwp_tmp,
+                    tb_tmp,
+                    lwc_tmp,
+                    irt_tmp,
+                    base_new,
+                )
             else:
                 tb_clr, irt_clr = tb_tmp, irt_tmp
 
@@ -120,11 +125,9 @@ def rad_trans(
         "irt": np.expand_dims(irt, 0),
         "irt_pro": np.expand_dims(irt_pro, 0),
         "irt_clr": np.expand_dims(irt_clr, 0),
-        "lwc": np.expand_dims(lwc, 0),
-        "lwc_pro": np.expand_dims(lwc_pro, 0),
         "lwp": np.asarray([lwp]),
         "lwp_pro": np.asarray([lwp_pro]),
-        "iwv": np.asarray([input_dat["iwv"]]),
+        "iwv": input_dat["iwv"],
         "cbh": np.asarray([base]),
         "cbh_pro": np.asarray([base_pro]),
     }
