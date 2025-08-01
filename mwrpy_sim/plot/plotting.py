@@ -135,7 +135,7 @@ def _set_title(
 def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
     """Plots a histogram of the data."""
     assert meta.plot_range is not None, "Plot range must be defined in PlotMeta."
-    ax.hist(
+    h = ax.hist(
         data,
         bins=np.linspace(meta.plot_range[0], meta.plot_range[1], 25),
         density=True,
@@ -143,8 +143,10 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
         color="black",
         linewidth=1.0,
         histtype="step",
+        log=True,
     )
-    ax.set_yscale("log")
+    ax.set_ylim([1e-1, np.max([np.max(h[0]), 1e0])])
+    ax.yaxis.set_minor_locator(plt.NullLocator())
     ax.text(
         0.05,
         0.1,
