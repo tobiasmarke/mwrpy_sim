@@ -5,9 +5,13 @@ __pycache__
 *checkpoint.py
 build
 dist
-tests/2*
 tests/radiosonde
 tests/plots
+tests/data/lblout
+xs
+FSCDXS
 mwrpy_sim/rad_trans/coeff/ssp*
 mwrpy_sim/rad_trans/coeff/solar*
+mwrpy_sim/rad_trans/coeff/TAPE*
+mwrpy_sim/rad_trans/coeff/irt_srf*
 *.nc

@@ -173,7 +173,7 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
         if obj.name in ("tb", "tb_pro", "tb_clr"):
             size = ("time", "frequency", "elevation_angle")
         if obj.name in ("irt", "irt_pro", "irt_clr"):
-            size = ("time", "wavelength", "elevation_angle")
+            size = ("time", "wavelength")
         if obj.name in (
             "air_temperature",
             "absolute_humidity",

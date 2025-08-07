@@ -24,7 +24,7 @@ def rad_trans(
         for _ in range(3)
     )
     irt, irt_pro, irt_clr = (
-        np.ones((1, len(params["wavelength"]), len(theta)), np.float32) * FillValue
+        np.ones((1, len(params["wavelength"])), np.float32) * FillValue
         for _ in range(3)
     )
     lwp, lwp_pro, base, base_pro = (FillValue for _ in range(4))
@@ -87,13 +87,12 @@ def rad_trans(
                 np.float32,
             ).T
 
-            # IR radiative transport
+            # IR radiative transport (for zenith only)
             config = read_config(None, "global_specs")
             irt_tmp = (
                 calc_ir_rt(input_dat, lwc_tmp, base_tmp, top, params)
                 if config["calc_ir"]
-                else np.ones((len(params["wavelength"]), len(theta)), np.float32)
-                * FillValue
+                else np.ones((len(params["wavelength"])), np.float32) * FillValue
             )
             base_new = base_tmp[0] if len(base_tmp) > 0 else FillValue
 
