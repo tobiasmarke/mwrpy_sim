@@ -1,3 +1,9 @@
+## 0.8.2 – 2025-08-14
+
+- Select effective radius based on LWC
+- Add cloud boundaries / site parameters to output file and fix cloud method
+- Update IR method and IRT array
+
 ## 0.8.1 – 2025-08-01
 
 - Patch output array and plot
