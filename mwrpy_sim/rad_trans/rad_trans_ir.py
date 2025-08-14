@@ -16,7 +16,6 @@ def calc_ir_rt(
     base: np.ndarray,
     top: np.ndarray,
     params: dict,
-    reff: float = 9.0,
 ) -> np.ndarray:
     """Calculate IR radiative transfer.
     LNFL, LBLRTM, and LBLDIS are maintained by the Radiation and Climate Group
@@ -28,7 +27,6 @@ def calc_ir_rt(
         base: Base heights of cloud layers (m).
         top: Top heights of cloud layers (m).
         params: Dictionary containing simulation parameters.
-        reff: Effective radius of cloud droplets (µm) (default is 9 µm).
     Output:
         IR brightness temperatures for 3 IRT channels.
     """
@@ -70,17 +68,48 @@ def calc_ir_rt(
         subprocess.call(f"mv TAPE* ODdeflt* TMPX* {lbl_out}", shell=True)
 
         # Calculate tau
-        tau = np.zeros(len(base), np.float32)
+        tau, reff = np.zeros(len(base), np.float32), np.zeros(len(base), np.float32)
+        lwc_bnd = [0.0, 2e-4, 4e-4]
+        reff_a = [4.0, 6.0, 20.0]  # from Karstens et al. [1994]
         if len(base) > 0:
             for i in range(len(base)):
                 b_i = np.where(input_dat["height"][:] == base[i])[0][0]
                 t_i = np.where(input_dat["height"][:] == top[i])[0][0]
-                height_hl = (
-                    input_dat["height"][b_i - 1 : t_i + 1]
-                    + input_dat["height"][b_i : t_i + 2]
-                ) / 2.0
-                lwp = np.sum(lwc[b_i : t_i + 1] * np.diff(height_hl))
-                tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff * 1e-6)
+                lwp = 0.0
+                if t_i == b_i and b_i - 1 >= 0 and t_i + 1 < len(input_dat["height"]):
+                    lwp = lwc[b_i] * (
+                        input_dat["height"][b_i : t_i + 1]
+                        - input_dat["height"][b_i - 1 : t_i]
+                    )
+                    reff[i] = reff_a[np.argwhere(lwc[b_i] > lwc_bnd)[-1][0]]
+                elif (
+                    t_i == b_i + 1
+                    and b_i - 1 >= 0
+                    and t_i + 1 < len(input_dat["height"])
+                ):
+                    lwp = np.sum(
+                        np.take(lwc, [b_i, t_i])
+                        * (
+                            input_dat["height"][b_i : t_i + 1]
+                            - input_dat["height"][b_i - 1 : t_i]
+                        )
+                    )
+                    reff[i] = reff_a[
+                        np.argwhere(np.max(np.take(lwc, [b_i, t_i])) > lwc_bnd)[-1][0]
+                    ]
+                elif t_i > b_i + 1:
+                    lwp = np.sum(
+                        (lwc[b_i : t_i - 1] + lwc[b_i + 1 : t_i])
+                        / 2.0
+                        * np.diff(input_dat["height"][b_i:t_i])
+                    )
+                    reff[i] = reff_a[
+                        np.argwhere(
+                            np.max((lwc[b_i : t_i - 1] + lwc[b_i + 1 : t_i]) / 2.0)
+                            > lwc_bnd
+                        )[-1][0]
+                    ]
+                tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff[i] * 1e-6)
 
         # Make parameter file for LBLDIS
         make_lbldis_file(
@@ -107,8 +136,7 @@ def calc_ir_rt(
             lines_s = [line.strip().split() for line in lines[2:]]
             wvnum = np.array([float(line[0]) for line in lines_s])
             rad = np.array([float(line[1]) for line in lines_s])
-
-    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
         print(f"Error during IR radiative transfer calculation: {e}")
         subprocess.call(f"rm ODdeflt* TMPX* TAPE*", shell=True)
         subprocess.call([f"rm {lbl_out}/*"], shell=True)
@@ -128,7 +156,7 @@ def make_lbldis_file(
     time: int,
     base: np.ndarray,
     tau: np.ndarray,
-    reff: float,
+    reff: np.ndarray,
 ) -> None:
     """Create a LBLDIS parameter file."""
     # Specify paths of solar source and scattering files
@@ -173,7 +201,9 @@ def make_lbldis_file(
         if len(base) > 0:
             f.write(f"{len(base)}\t\t" + "Number of cloud layers\n")
             for i in range(len(base)):
-                f.write(f"0 {np.round(base[i], 3)} {reff} -1 {np.round(tau[i], 3)}\n")
+                f.write(
+                    f"0 {np.round(base[i], 3)} {reff[i]} -1 {np.round(tau[i], 3)}\n"
+                )
         else:
             f.write("0\t\t" + "Number of cloud layers\n")
         f.write(f"{lbl_out}\n")
