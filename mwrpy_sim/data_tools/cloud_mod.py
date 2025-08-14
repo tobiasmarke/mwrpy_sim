@@ -34,7 +34,7 @@ def detect_cloud_mod(z, lwc):
     return z[i_top], z[i_base]
 
 
-def detect_liq_cloud(z, t, rh, p_rs):
+def detect_liq_cloud(z, t, rh, p_rs: np.ndarray = np.empty(0)):
     """Detect liquid water cloud boundaries from relative humidity and temperature.
 
     Adapted from PAMTRA:
@@ -47,22 +47,25 @@ def detect_liq_cloud(z, t, rh, p_rs):
         z: height grid
         T: temperature on z
         rh: relative humidty on z
-        rh_thres: relative humidity threshold for the detection on liquid clouds on z
-        T_thres: do not detect liquid water clouds below this value (scalar)
+        p_rs: pressure on z (for variable threshold)
     Output:
         z_top: array of cloud tops
         z_base: array of cloud bases
     """
-    # alpha = 0.59
-    # beta = 1.37
-    # sigma = p_rs / p_rs[0]
-    # rh_thres = 1.0 - alpha * sigma * (1.0 - sigma) * (1.0 + beta * (sigma - 0.5))
-    rh_thres = 0.95  # 1
+    if len(p_rs) == len(z):
+        alpha = 0.59
+        beta = 1.37
+        sigma = p_rs / p_rs[0]
+        rh_thres = 1.0 - alpha * sigma * (1.0 - sigma) * (1.0 + beta * (sigma - 0.5))
+    else:
+        rh_thres = 0.95  # 1
     t_thres = 253.15  # K
-    # ***determine cloud boundaries
 
+    # determine cloud boundaries
     i_cloud, i_top, i_base = (
-        np.array(np.where((rh > rh_thres) & (t > t_thres))[0], dtype=np.int32),
+        np.array(
+            np.where((rh > rh_thres) & (t > t_thres) & (z > z[0]))[0], dtype=np.int32
+        ),
         np.empty(0, np.int32),
         np.empty(0, np.int32),
     )

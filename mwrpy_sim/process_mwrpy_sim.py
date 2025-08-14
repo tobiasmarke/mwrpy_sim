@@ -55,7 +55,7 @@ def main(args):
             sim_in = sim_mwr.Sim(data_nc)
             sim_in.data = get_data_attributes(sim_in.data, args.source)
             logging.info(f"Saving output file {file_name}")
-            sim_mwr.save_sim(sim_in, file_name, global_specs, args.source)
+            sim_mwr.save_sim(sim_in, file_name, global_specs, args.source, params)
     if args.command in ("process", "plot"):
         if not os.path.isfile(file_name):
             logging.error(f"File {file_name} does not exist.")
