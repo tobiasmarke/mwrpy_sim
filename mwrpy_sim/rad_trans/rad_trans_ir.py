@@ -16,7 +16,6 @@ def calc_ir_rt(
     base: np.ndarray,
     top: np.ndarray,
     params: dict,
-    reff: float = 9.0,
 ) -> np.ndarray:
     """Calculate IR radiative transfer.
     LNFL, LBLRTM, and LBLDIS are maintained by the Radiation and Climate Group
@@ -28,94 +27,139 @@ def calc_ir_rt(
         base: Base heights of cloud layers (m).
         top: Top heights of cloud layers (m).
         params: Dictionary containing simulation parameters.
-        reff: Effective radius of cloud droplets (µm) (default is 9 µm).
     Output:
         IR brightness temperatures for 3 IRT channels.
     """
-    tape_out = str(os.path.join(params["data_out"] + "TAPE/"))
-    if not os.path.exists(tape_out):
-        os.makedirs(tape_out)
+    lbl_out = str(os.path.join(params["data_out"] + "lblout/"))
+    if not os.path.exists(lbl_out):
+        os.makedirs(lbl_out)
 
-    # Create a TAPE5 file for LBLRTM
-    profiles: dict = {
-        "wvmr": input_dat["mixr"][:] * 1000.0,
-        "tmpc": input_dat["air_temperature"][:] - 273.15,
-        "pres": input_dat["air_pressure"][:] / 100.0,
-        "hght": (input_dat["height"][:] - input_dat["height"][0]) / 1000.0,
-    }
-    with contextlib.redirect_stdout(None):
-        makeFile(
-            "TAPE5",
-            650,
-            1150,
-            0,
-            ZNBD=np.array(params["height"][:], np.float32) / 1000.0,
-            IEMIT=0,
-            profiles=profiles,
+    try:
+        # Create a TAPE5 file for LBLRTM
+        profiles: dict = {
+            "wvmr": input_dat["mixr"][:] * 1000.0,
+            "tmpc": input_dat["air_temperature"][:] - 273.15,
+            "pres": input_dat["air_pressure"][:] / 100.0,
+            "hght": (input_dat["height"][:] - input_dat["height"][0]) / 1000.0,
+        }
+        with contextlib.redirect_stdout(None):
+            makeFile(
+                "TAPE5",
+                650,
+                1150,
+                0,
+                IXSECT=1,
+                ZNBD=np.array(params["height"][:], np.float32) / 1000.0,
+                IEMIT=0,
+                profiles=profiles,
+            )
+
+        # Link TAPE3 to the current working directory
+        tape3_pth = os.path.dirname(os.path.realpath(__file__)) + "/coeff/TAPE3"
+        subprocess.call(f"ln -s {tape3_pth} {os.getcwd()}/TAPE3", shell=True)
+
+        # Run LBLRTM to create OD files for gaseous absorbers
+        subprocess.run(
+            ["lblrtm"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        subprocess.call(f"mv TAPE* ODdeflt* TMPX* {lbl_out}", shell=True)
+
+        # Calculate tau
+        tau, reff = np.zeros(len(base), np.float32), np.zeros(len(base), np.float32)
+        lwc_bnd = [0.0, 2e-4, 4e-4]
+        reff_a = [4.0, 6.0, 20.0]  # from Karstens et al. [1994]
+        if len(base) > 0:
+            for i in range(len(base)):
+                b_i = np.where(input_dat["height"][:] == base[i])[0][0]
+                t_i = np.where(input_dat["height"][:] == top[i])[0][0]
+                lwp = 0.0
+                if t_i == b_i and b_i - 1 >= 0 and t_i + 1 < len(input_dat["height"]):
+                    lwp = lwc[b_i] * (
+                        input_dat["height"][b_i : t_i + 1]
+                        - input_dat["height"][b_i - 1 : t_i]
+                    )
+                    reff[i] = reff_a[np.argwhere(lwc[b_i] > lwc_bnd)[-1][0]]
+                elif (
+                    t_i == b_i + 1
+                    and b_i - 1 >= 0
+                    and t_i + 1 < len(input_dat["height"])
+                ):
+                    lwp = np.sum(
+                        np.take(lwc, [b_i, t_i])
+                        * (
+                            input_dat["height"][b_i : t_i + 1]
+                            - input_dat["height"][b_i - 1 : t_i]
+                        )
+                    )
+                    reff[i] = reff_a[
+                        np.argwhere(np.max(np.take(lwc, [b_i, t_i])) > lwc_bnd)[-1][0]
+                    ]
+                elif t_i > b_i + 1:
+                    lwp = np.sum(
+                        (lwc[b_i : t_i - 1] + lwc[b_i + 1 : t_i])
+                        / 2.0
+                        * np.diff(input_dat["height"][b_i:t_i])
+                    )
+                    reff[i] = reff_a[
+                        np.argwhere(
+                            np.max((lwc[b_i : t_i - 1] + lwc[b_i + 1 : t_i]) / 2.0)
+                            > lwc_bnd
+                        )[-1][0]
+                    ]
+                tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff[i] * 1e-6)
+
+        # Make parameter file for LBLDIS
+        make_lbldis_file(
+            lbl_out,
+            params,
+            650.0,
+            1150.0,
+            int(input_dat["time"]),
+            base / 1000.0,
+            tau,
+            reff,
         )
 
-    # Run LNFL to create TAPE3 file for LBLRTM
-    subprocess.run(
-        ["lnfl", f"{tape_out}TAPE1", "TAPE5"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
-    )
+        # Run LBLDIS
+        subprocess.run(
+            ["lbldis", f"{lbl_out}lbldis.param", "0", f"{lbl_out}lbldisout"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
-    # Run LBLRTM to create OD files for gaseous absorbers
-    subprocess.run(
-        ["lblrtm"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-    )
-    subprocess.call(f"mv TAPE* {tape_out}", shell=True)
-    subprocess.call(f"mv ODdeflt* {tape_out}", shell=True)
+        # Read the output file
+        with open(f"{lbl_out}lbldisout", "rb") as f:
+            lines = f.readlines()
+            lines_s = [line.strip().split() for line in lines[2:]]
+            wvnum = np.array([float(line[0]) for line in lines_s])
+            rad = np.array([float(line[1]) for line in lines_s])
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
+        print(f"Error during IR radiative transfer calculation: {e}")
+        subprocess.call(f"rm ODdeflt* TMPX* TAPE*", shell=True)
+        subprocess.call([f"rm {lbl_out}/*"], shell=True)
+        return np.ones((3, 1), np.float32) * -999.0
 
-    # Calculate tau
-    tau = np.zeros(len(base), np.float32)
-    if len(base) > 0:
-        for i in range(len(base)):
-            b_i = np.where(input_dat["height"][:] == base[i])[0][0]
-            t_i = np.where(input_dat["height"][:] == top[i])[0][0]
-            height_hl = (
-                input_dat["height"][b_i - 1 : t_i + 1]
-                + input_dat["height"][b_i : t_i + 2]
-            ) / 2.0
-            lwp = np.sum(lwc[b_i : t_i + 1] * np.diff(height_hl))
-            tau[i] = 3.0 / 2.0 * lwp / (1000.0 * reff * 1e-6)
-
-    # Make parameter file for LBLDIS
-    make_lbldis_file(
-        params, 650, 1150, int(input_dat["time"]), base / 1000.0, tau, reff
-    )
-
-    # Run LBLDIS
-    subprocess.run(
-        ["lbldis", f"{tape_out}lbldis.param", "0", f"{tape_out}lbldisout"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-    # Read the output file
-    with open(f"{tape_out}lbldisout", "rb") as f:
-        lines = f.readlines()
-        lines_s = [line.strip().split() for line in lines[2:]]
-        wvnum = np.array([float(line[0]) for line in lines_s])
-        rad = np.array([float(line[1]) for line in lines_s])
+    # Clean up temporary files
+    subprocess.call([f"rm {lbl_out}/*"], shell=True)
 
     return irspectrum2irt(rad, wvnum)
 
 
 def make_lbldis_file(
+    lbl_out: str,
     params: dict,
     v1: float,
     v2: float,
     time: int,
     base: np.ndarray,
     tau: np.ndarray,
-    reff: float,
+    reff: np.ndarray,
 ) -> None:
     """Create a LBLDIS parameter file."""
-    # Specify output directory, solar source and scattering files
-    data_out = params["data_out"] + "TAPE/"
+    # Specify paths of solar source and scattering files
     solar_src = (
         os.path.dirname(os.path.realpath(__file__))
         + "/coeff/solar.kurucz.rad.1cm-1binned.full_disk.asc"
@@ -138,7 +182,7 @@ def make_lbldis_file(
     sol_azi = np.round(sol["azimuth"] * 180.0 / np.pi + 180.0, 2)
 
     # Write the LBLDIS parameter file
-    with open(os.path.join(data_out, "lbldis.param"), "w") as f:
+    with open(os.path.join(lbl_out, "lbldis.param"), "w") as f:
         f.write("LBLDIS parameter file\n")
         f.write("16\t\t" + "Number of streams\n")
         f.write(
@@ -157,10 +201,12 @@ def make_lbldis_file(
         if len(base) > 0:
             f.write(f"{len(base)}\t\t" + "Number of cloud layers\n")
             for i in range(len(base)):
-                f.write(f"0 {np.round(base[i], 3)} {reff} -1 {np.round(tau[i], 3)}\n")
+                f.write(
+                    f"0 {np.round(base[i], 3)} {reff[i]} -1 {np.round(tau[i], 3)}\n"
+                )
         else:
             f.write("0\t\t" + "Number of cloud layers\n")
-        f.write(f"{data_out}\n")
+        f.write(f"{lbl_out}\n")
         f.write(f"{solar_src}\n")
         f.write("2\t\t" + "Number of scattering property databases\n")
         f.write(f"{ssp_wat}\n")
@@ -186,7 +232,7 @@ def irspectrum2irt(
     srf = loadCoeffsJSON(path)
 
     # Calculate IRT
-    irt = np.zeros((3, 1), np.float32)
+    irt = np.zeros((3,), np.float32)
     for i in range(3):
         srf_wnum = np.pad(
             np.flip(10000.0 / srf[f"wnum_irt{i + 1}"]),
@@ -201,8 +247,8 @@ def irspectrum2irt(
             constant_values=(0.0, 0.0),
         )
         weight = np.interp(wavenumber, srf_wnum, srf_resp, left=0.0, right=0.0)
-        mwnum = np.sum(wavenumber * weight) / np.sum(weight)
-        mrad = np.sum(ir_spectrum * weight) / np.sum(weight)
+        mwnum = np.divide(np.sum(wavenumber * weight), np.sum(weight))
+        mrad = np.divide(np.sum(ir_spectrum * weight), np.sum(weight))
         irt[i] = invplanck(mwnum, mrad)
 
     return irt
@@ -210,8 +256,8 @@ def irspectrum2irt(
 
 def invplanck(wavenumber: float, radiance: float) -> float:
     """Calculate brightness temperature from wavenumber and radiance."""
-    C1 = 1.191042722e-12
-    C2 = 1.4387752
-    C1 = C1 * 1e7
+    c1 = 1.191042722e-12
+    c2 = 1.4387752
+    c1 = c1 * 1e7
 
-    return C2 * wavenumber / (np.log(1.0 + (C1 * wavenumber**3 / radiance)))
+    return c2 * wavenumber / (np.log(1.0 + (c1 * wavenumber**3 / radiance)))

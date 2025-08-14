@@ -60,14 +60,14 @@ class SimArray:
             return self.variable[:]
         if isinstance(self.variable, np.ndarray):
             return self.variable
-        if isinstance(self.variable, (int, float)):
-            return np.array(self.variable)
         if isinstance(self.variable, str):
             try:
                 numeric_value = utils.str_to_numeric(self.variable)
                 return np.array(numeric_value)
             except ValueError:
                 pass
+        if isinstance(self.variable, (int, float)):
+            return np.array(self.variable)
         raise ValueError(f"Incorrect SimArray input: {self.variable}")
 
     def _init_units(self, units_from_user: str | None) -> str:
@@ -95,7 +95,7 @@ class Sim:
         return data
 
 
-def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
+def save_sim(sim: Sim, output_file: str, att: dict, source: str, params: dict) -> None:
     """Saves the Sim MWR file."""
     dims = {
         "time": len(sim.data["time"].data),
@@ -103,12 +103,18 @@ def save_sim(sim: Sim, output_file: str, att: dict, source: str) -> None:
         "wavelength": len(sim.data["wavelength"].data),
         "height": len(sim.data["height"].data),
         "elevation_angle": len(sim.data["elevation_angle"].data),
+        "cloud_layer": 15,
     }
 
     with init_file(output_file, dims, sim.data, att) as rootgrp:
         setattr(rootgrp, "source", source)
         if not "era5" in source:
             rootgrp.delncattr("era5")
+        for key, value in params.items():
+            if key in ("altitude", "latitude", "longitude"):
+                if isinstance(value, (int, float, bool)):
+                    value = str(value)
+                setattr(rootgrp, key, value)
 
 
 def init_file(
@@ -160,8 +166,6 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             "iwv",
             "lwp",
             "lwp_pro",
-            "cbh",
-            "cbh_pro",
             "k_index",
             "ko_index",
             "total_totals_index",
@@ -173,7 +177,7 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
         if obj.name in ("tb", "tb_pro", "tb_clr"):
             size = ("time", "frequency", "elevation_angle")
         if obj.name in ("irt", "irt_pro", "irt_clr"):
-            size = ("time", "wavelength", "elevation_angle")
+            size = ("time", "wavelength")
         if obj.name in (
             "air_temperature",
             "absolute_humidity",
@@ -183,6 +187,8 @@ def _write_vars2nc(nc_file: netCDF4.Dataset, mwr_variables: dict) -> None:
             "lwc_pro",
         ):
             size = ("time", "height")
+        if obj.name in ("cbh", "cbh_pro", "cth", "cth_pro"):
+            size = ("time", "cloud_layer")
         nc_variable = nc_file.createVariable(
             obj.name, obj.data_type, size, zlib=True, fill_value=fill_value
         )

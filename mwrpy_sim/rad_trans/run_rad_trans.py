@@ -18,16 +18,20 @@ def rad_trans(
 ) -> dict:
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = -999.0
+    config = read_config(None, "global_specs")
     theta = 90.0 - np.array(params["elevation_angle"])
     tb, tb_pro, tb_clr = (
         np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
         for _ in range(3)
     )
     irt, irt_pro, irt_clr = (
-        np.ones((1, len(params["wavelength"]), len(theta)), np.float32) * FillValue
+        np.ones((1, len(params["wavelength"])), np.float32) * FillValue
         for _ in range(3)
     )
-    lwp, lwp_pro, base, base_pro = (FillValue for _ in range(4))
+    lwp, lwp_pro = (FillValue for _ in range(2))
+    base, base_pro, top, top_pro = (
+        np.ones(15, np.float32) * FillValue for _ in range(4)
+    )
 
     # Cloud geometry [m] / cloud water content (LWC, LWP)
     cloud_methods = (
@@ -37,14 +41,14 @@ def rad_trans(
     )
     for method in cloud_methods:
         if method == "clear":
-            lwc_tmp, lwp_tmp, base_tmp, top = (
+            lwc_tmp, lwp_tmp, base_tmp, top_tmp = (
                 np.zeros(len(input_dat["height"][:]), np.float32),
                 0.0,
                 np.empty(0, np.float32),
                 np.ones(1, np.float32) * FillValue,
             )
         else:
-            top, base_tmp = (
+            top_tmp, base_tmp = (
                 detect_cloud_mod(input_dat["height"][:], input_dat["lwc_in"][:])
                 if method == "prognostic"
                 else (
@@ -52,13 +56,12 @@ def rad_trans(
                         input_dat["height"][:],
                         input_dat["air_temperature"][:],
                         input_dat["relative_humidity"][:],
-                        input_dat["air_pressure"][:],
                     )
                 )
             )
             lwc_tmp, lwp_tmp = (
-                get_cloud_prop(base_tmp, top, input_dat, method)
-                if len(top) in np.linspace(1, 15, 15)
+                get_cloud_prop(base_tmp, top_tmp, input_dat, method)
+                if len(top_tmp) in np.linspace(1, 15, 15)
                 else (np.zeros(len(input_dat["height"][:]), np.float32), 0.0)
             )
 
@@ -87,31 +90,44 @@ def rad_trans(
                 np.float32,
             ).T
 
-            # IR radiative transport
-            config = read_config(None, "global_specs")
+            # IR radiative transport (for zenith only)
             irt_tmp = (
-                calc_ir_rt(input_dat, lwc_tmp, base_tmp, top, params)
+                calc_ir_rt(input_dat, lwc_tmp, base_tmp, top_tmp, params)
                 if config["calc_ir"]
-                else np.ones((len(params["wavelength"]), len(theta)), np.float32)
-                * FillValue
+                else np.ones((len(params["wavelength"])), np.float32) * FillValue
             )
-            base_new = base_tmp[0] if len(base_tmp) > 0 else FillValue
 
             if method == "prognostic":
-                lwp_pro, tb_pro, input_dat["lwc_pro"], irt_pro, base_pro = (
+                (
+                    lwp_pro,
+                    tb_pro,
+                    input_dat["lwc_pro"],
+                    irt_pro,
+                    base_pro[0 : len(base_tmp)],
+                    top_pro[0 : len(top_tmp)],
+                ) = (
                     lwp_tmp,
                     tb_tmp,
                     lwc_tmp,
                     irt_tmp,
-                    base_new,
+                    base_tmp,
+                    top_tmp,
                 )
             elif method == "detected":
-                lwp, tb, input_dat["lwc"], irt, base = (
+                (
+                    lwp,
+                    tb,
+                    input_dat["lwc"],
+                    irt,
+                    base[0 : len(base_tmp)],
+                    top[0 : len(top_tmp)],
+                ) = (
                     lwp_tmp,
                     tb_tmp,
                     lwc_tmp,
                     irt_tmp,
-                    base_new,
+                    base_tmp,
+                    top_tmp,
                 )
             else:
                 tb_clr, irt_clr = tb_tmp, irt_tmp
@@ -128,8 +144,10 @@ def rad_trans(
         "lwp": np.asarray([lwp]),
         "lwp_pro": np.asarray([lwp_pro]),
         "iwv": input_dat["iwv"],
-        "cbh": np.asarray([base]),
-        "cbh_pro": np.asarray([base_pro]),
+        "cbh": np.expand_dims(base, 0),
+        "cbh_pro": np.expand_dims(base_pro, 0),
+        "cth": np.expand_dims(top, 0),
+        "cth_pro": np.expand_dims(top_pro, 0),
     }
     var_names = [
         "air_pressure",

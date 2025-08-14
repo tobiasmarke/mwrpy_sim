@@ -154,16 +154,24 @@ ATTRIBUTES_SOURCE = {
         units="kg m-2",
     ),
     "cbh": MetaData(
-        long_name="Height of cloud base above mean sea level derived from ",
+        long_name="Cloud base heights above mean sea level derived from ",
         standard_name="cloud_base_height_above_mean_sea_level",
         units="m",
-        comment="Cloud base height of the lowest cloud layer",
     ),
     "cbh_pro": MetaData(
-        long_name="Height of cloud base above mean sea level (prognostic) derived from ",
+        long_name="Cloud base heights above mean sea level (prognostic) derived from ",
         standard_name="cloud_base_height_above_mean_sea_level",
         units="m",
-        comment="Cloud base height of the lowest cloud layer",
+    ),
+    "cth": MetaData(
+        long_name="Cloud top heights above mean sea level derived from ",
+        standard_name="cloud_top_height_above_mean_sea_level",
+        units="m",
+    ),
+    "cth_pro": MetaData(
+        long_name="Cloud top heights above mean sea level (prognostic) derived from ",
+        standard_name="cloud_top_height_above_mean_sea_level",
+        units="m",
     ),
     "k_index": MetaData(
         long_name="K-index derived from ",
