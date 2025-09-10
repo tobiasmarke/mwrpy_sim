@@ -21,10 +21,10 @@ from mwrpy_sim.atmos import (
 from mwrpy_sim.utils import seconds_since_epoch
 
 
-def prepare_ifs(ifs_data: nc.Dataset, index: int, date_i: str) -> dict:
+def prepare_ifs(ifs_data: nc.Dataset, index: int, date_i: str, hasl: float) -> dict:
     """Prepare input data from ECMWF's IFS model (Cloudnet format)."""
     input_ifs = {
-        "height": ifs_data["height"][index, :],
+        "height": ifs_data["height"][index, :] + hasl,
         "air_temperature": ifs_data["temperature"][index, :],
         "air_pressure": ifs_data["pressure"][index, :],
         "relative_humidity": ifs_data["rh"][index, :],
@@ -242,20 +242,24 @@ def _add_vars(input_dat) -> dict:
     input_dat["e"] = calc_rho(
         input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
     )
-    input_dat["mixr"] = mixr(
-        input_dat["air_temperature"][:],
-        input_dat["absolute_humidity"][:],
-        input_dat["air_pressure"][0],
-        input_dat["height"][:],
-    )
+    if "mixr" not in input_dat:
+        input_dat["mixr"] = mixr(
+            input_dat["air_temperature"][:],
+            input_dat["absolute_humidity"][:],
+            input_dat["air_pressure"][0],
+            input_dat["height"][:],
+        )
     if "iwv" not in input_dat:
-        input_dat["iwv"] = (
-            hum_to_iwv(
-                input_dat["absolute_humidity"][:],
-                input_dat["height"][:],
-            )
-            if not np.any(input_dat["absolute_humidity"].mask)
-            else -999.0
+        input_dat["iwv"] = np.array(
+            [
+                hum_to_iwv(
+                    input_dat["absolute_humidity"][:],
+                    input_dat["height"][:],
+                )
+                if not np.any(input_dat["absolute_humidity"].mask)
+                else -999.0
+            ],
+            dtype=np.float64,
         )
 
     return input_dat

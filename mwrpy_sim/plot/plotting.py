@@ -39,6 +39,8 @@ def plot_sim_data(
             data = sim_data.variables[var_name][:].data
             data = np.ma.masked_equal(data, -999.0)
             data *= 1000.0 if "lwc" in var_name else 1.0
+            data /= 100.0 if "air_pressure" in var_name else 1.0
+            data *= 100.0 if "relative_humidity" in var_name else 1.0
         if data.ndim == 1:
             _plot_histogram(ax, data, meta)
         elif data.ndim == 2:
@@ -103,7 +105,7 @@ def _handle_saving(
 def _set_axis(ax, meta: PlotMeta) -> None:
     """Sets axis range and labels defined in PlotMeta."""
     pos = ax.get_position()
-    y_label = "Height amsl (m)" if meta.source == "profile" else "Log frequency"
+    y_label = "Height above m.s.l. (m)" if meta.source == "profile" else "Log frequency"
     if pos.x0 < 0.1:
         ax.set_ylabel(y_label)
     elif pos.x1 > 0.1 and meta.source == "profile":
@@ -145,15 +147,14 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
         histtype="step",
         log=True,
     )
-    ax.set_ylim([1e-1, np.max([np.max(h[0]), 1e0])])
+    ax.set_ylim([np.min([np.min(h[0]), 1e-1]), np.max([np.max(h[0]), 1e0])])
     ax.yaxis.set_minor_locator(plt.NullLocator())
     ax.text(
-        0.05,
         0.1,
+        0.8,
         f"mean: {np.ma.mean(data):.2f} {meta.xlabel}\n",
         transform=ax.transAxes,
         fontsize=12,
-        verticalalignment="top",
     )
 
 
@@ -177,7 +178,7 @@ def _plot_profile(
     if m_cbh is not None:
         ax.text(
             0.05,
-            0.85,
+            0.9,
             f"mean CBH: {np.ma.mean(m_cbh[:]):.2f} m",
             transform=ax.transAxes,
             fontsize=12,

@@ -1,3 +1,8 @@
+## 0.8.3 – 2025-09-10
+
+- Improve plotting
+- Fix IR+IFS
+
 ## 0.8.2 – 2025-08-14
 
 - Select effective radius based on LWC
