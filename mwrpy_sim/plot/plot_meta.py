@@ -17,21 +17,21 @@ _KGM2 = "kg m$^{-2}$"
 _KGM3 = "kg m$^{-3}$"
 _GM2 = "g m$^{-2}$"
 _GM3 = "g m$^{-3}$"
-_1 = "1"
-_Pa = "Pa"
+_PP = "%"
+_hPa = "hPa"
 
 # Attributes define order of plots.
 ATTRIBUTES = {
     "lwp": PlotMeta(
         name="LWP",
         xlabel=_KGM2,
-        plot_range=(0.0, 1.8),
+        plot_range=(0.0, 1.9),
         source="1d",
     ),
     "lwp_pro": PlotMeta(
         name="LWP (prognostic)",
         xlabel=_KGM2,
-        plot_range=(0.0, 1.8),
+        plot_range=(0.0, 1.9),
         source="1d",
     ),
     "iwv": PlotMeta(
@@ -43,19 +43,19 @@ ATTRIBUTES = {
     "lwc": PlotMeta(
         name="LWC",
         xlabel=_GM3,
-        plot_range=(0.0, 0.5),
+        plot_range=(0.0, 0.3),
         source="profile",
     ),
     "lwc_pro": PlotMeta(
         name="LWC (prognostic)",
         xlabel=_GM3,
-        plot_range=(0.0, 0.5),
+        plot_range=(0.0, 0.3),
         source="profile",
     ),
     "relative_humidity": PlotMeta(
         name="Relative humidity",
-        xlabel=_1,
-        plot_range=(0.0, 1.3),
+        xlabel=_PP,
+        plot_range=(0.0, 120.0),
         source="profile",
     ),
     "absolute_humidity": PlotMeta(
@@ -72,8 +72,8 @@ ATTRIBUTES = {
     ),
     "air_pressure": PlotMeta(
         name="Air pressure",
-        xlabel=_Pa,
-        plot_range=(0.0, 120000.0),
+        xlabel=_hPa,
+        plot_range=(0.0, 1200.0),
         source="profile",
     ),
 }
