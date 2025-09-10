@@ -100,7 +100,9 @@ def process_input(
                                 f"Radiative transfer using {source} data "
                                 f"for {site}, {date_i[:-2]}"
                             )
-                        input_ifs = prepare_ifs(ifs_data, index, date_i)
+                        input_ifs = prepare_ifs(
+                            ifs_data, index, date_i, params["altitude"]
+                        )
                         if len(input_ifs) > 0:
                             try:
                                 output_hour = call_rad_trans(input_ifs, params)
@@ -193,13 +195,13 @@ def process_input(
 
     elif source == "radiosonde":
         for date in date_range(start_date, stop_date):
-            file_names = get_file_list(
+            f_names = get_file_list(
                 params["data_rs"] + date.strftime("%Y/%m/%d/"), "radiosonde"
             )
-            for file in file_names:
+            for file in f_names:
                 if os.path.isfile(file):
                     with nc.Dataset(file) as rs_data:
-                        if file == file_names[0]:
+                        if file == f_names[0]:
                             logging.info(
                                 f"Radiative transfer using {source} data "
                                 f"for {site}, {date.strftime('%Y%m%d')}"

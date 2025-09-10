@@ -81,7 +81,7 @@ def calc_ir_rt(
                         input_dat["height"][b_i : t_i + 1]
                         - input_dat["height"][b_i - 1 : t_i]
                     )
-                    reff[i] = reff_a[np.argwhere(lwc[b_i] > lwc_bnd)[-1][0]]
+                    reff[i] = reff_a[np.argwhere(lwc[b_i] >= lwc_bnd)[-1][0]]
                 elif (
                     t_i == b_i + 1
                     and b_i - 1 >= 0
@@ -136,11 +136,16 @@ def calc_ir_rt(
             lines_s = [line.strip().split() for line in lines[2:]]
             wvnum = np.array([float(line[0]) for line in lines_s])
             rad = np.array([float(line[1]) for line in lines_s])
-    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
+    except (
+        ValueError,
+        FileNotFoundError,
+        RuntimeWarning,
+        subprocess.CalledProcessError,
+    ) as e:
         print(f"Error during IR radiative transfer calculation: {e}")
         subprocess.call(f"rm ODdeflt* TMPX* TAPE*", shell=True)
         subprocess.call([f"rm {lbl_out}/*"], shell=True)
-        return np.ones((3, 1), np.float32) * -999.0
+        return np.ones((3,), np.float32) * -999.0
 
     # Clean up temporary files
     subprocess.call([f"rm {lbl_out}/*"], shell=True)
