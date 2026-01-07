@@ -1,3 +1,6 @@
+import multiprocessing
+from functools import partial
+
 import numpy as np
 
 import mwrpy_sim.constants as con
@@ -6,15 +9,16 @@ from mwrpy_sim.utils import GAUSS, exponential_integration, read_config
 
 
 def calc_mw_rt(
-    z_final,
-    T_final,
-    p_final,
-    q_final,
-    LWC,
-    theta,
-    f,
+    z_final: np.ndarray,
+    T_final: np.ndarray,
+    p_final: np.ndarray,
+    q_final: np.ndarray,
+    LWC: np.ndarray,
+    f: np.ndarray,
     coeff_bdw: dict,
+    mp: bool,
     ape_ang: np.ndarray,
+    theta,
 ) -> np.ndarray:
     """Non-scattering microwave radiative transfer.
 
@@ -24,10 +28,11 @@ def calc_mw_rt(
         p_final: Pressure profile (hPa).
         q_final: Water vapor density profile (g/m^3).
         LWC: Liquid water content profile (g/m^3).
-        theta: Zenith angle of observation (degrees).
         f: Frequency vector (GHz).
         coeff_bdw: Coefficients for bandwidth/beamwidth correction.
+        mp: Multiprocessing flag (True/False).
         ape_ang: Array of antenna aperture angles (degrees).
+        theta: Zenith angle of observation (degrees).
 
     Returns:
         TB: Brightness temperatures for each frequency (K).
@@ -42,22 +47,38 @@ def calc_mw_rt(
 
     if not config["corrections"]:
         # No bandwidth/beamwidth correction
-        tau = np.array(
-            [
-                TAU_CALC(
-                    z_final,
-                    T_final,
-                    p_final,
-                    q_final,
-                    LWC,
-                    freq,
-                    config,
-                    theta,
-                )
-                for _, freq in enumerate(f)
-            ],
-            np.float32,
-        )
+        if mp:
+            pool = multiprocessing.Pool()
+            func = partial(
+                TAU_CALC,
+                z_final,
+                T_final,
+                p_final,
+                q_final,
+                LWC,
+                config,
+                theta,
+            )
+            tau = np.squeeze(np.array([pool.map(func, f)], np.float32))
+            pool.close()
+            pool.join()
+        else:
+            tau = np.array(
+                [
+                    TAU_CALC(
+                        z_final,
+                        T_final,
+                        p_final,
+                        q_final,
+                        LWC,
+                        config,
+                        theta,
+                        freq,
+                    )
+                    for _, freq in enumerate(f)
+                ],
+                np.float32,
+            )
         TB = TB_CALC(f, T_final, tau)
 
     else:
@@ -70,9 +91,9 @@ def calc_mw_rt(
                     p_final,
                     q_final,
                     LWC,
-                    freq,
                     config,
                     theta,
+                    freq,
                 )
                 for ind, freq in enumerate(f[:7])
             ],
@@ -86,9 +107,9 @@ def calc_mw_rt(
                     p_final,
                     q_final,
                     LWC,
-                    freq,
                     config,
                     theta,
+                    freq,
                 )
                 for ind, freq in enumerate(coeff_bdw["f_all"])
             ],
@@ -168,9 +189,9 @@ def TAU_CALC(
     p: np.ndarray,
     rhow: np.ndarray,
     LWC: np.ndarray,
-    f: float,
     config: dict,
     theta: float,
+    f: float,
 ) -> np.ndarray:
     """Calculate optical thickness tau.
 
