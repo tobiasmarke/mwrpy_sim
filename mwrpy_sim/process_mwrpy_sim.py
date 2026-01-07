@@ -1,23 +1,16 @@
 import datetime
 import logging
+import multiprocessing
 import os
 import time
+from functools import partial
 
 import netCDF4 as nc
 import numpy as np
 
 from mwrpy_sim import sim_mwr
+from mwrpy_sim.data_tools import prepare_input as prep
 from mwrpy_sim.data_tools.era5_download.get_era5 import era5_request
-from mwrpy_sim.data_tools.prepare_input import (
-    check_height,
-    prepare_era5_mod,
-    prepare_era5_pres,
-    prepare_icon,
-    prepare_ifs,
-    prepare_radiosonde,
-    prepare_standard_atmosphere,
-    prepare_vaisala,
-)
 from mwrpy_sim.plot.plotting import plot_sim_data
 from mwrpy_sim.rad_trans.rad_trans_meta import get_data_attributes
 from mwrpy_sim.rad_trans.run_rad_trans import rad_trans
@@ -25,6 +18,7 @@ from mwrpy_sim.utils import (
     _get_filename,
     append_data,
     date_range,
+    dict_from_list,
     get_file_list,
     get_processing_dates,
     isodate2date,
@@ -91,26 +85,23 @@ def process_input(
             file_name = get_file_list(data_in, "ecmwf")
             if len(file_name) == 1:
                 with nc.Dataset(file_name[0]) as ifs_data:
-                    for index, hour in enumerate(ifs_data["time"][:-1]):
-                        date_i = datetime.datetime.combine(
-                            date, datetime.time(int(hour))
-                        ).strftime("%Y%m%d%H")
-                        if date_i[-2:] == "00":
-                            logging.info(
-                                f"Radiative transfer using {source} data "
-                                f"for {site}, {date_i[:-2]}"
-                            )
-                        input_ifs = prepare_ifs(
-                            ifs_data, index, date_i, params["altitude"]
+                    ifs_dict = {
+                        var: np.squeeze(ifs_data.variables[var][:])
+                        for var in ifs_data.variables
+                    }
+                    start = time.process_time()
+                    pool = multiprocessing.Pool()
+                    func = partial(call_ifs_multi, ifs_dict, params, date)
+                    output_hour = dict_from_list(
+                        pool.map(
+                            func, np.arange(len(ifs_data["time"][:-1])), chunksize=2
                         )
-                        if len(input_ifs) > 0:
-                            try:
-                                output_hour = call_rad_trans(input_ifs, params)
-                            except ValueError:
-                                logging.info(f"Skipping time {date_i}")
-                                continue
-                            for key, array in output_hour.items():
-                                data_nc = append_data(data_nc, key, array)
+                    )
+                    pool.close()
+                    pool.join()
+                    data_nc = append_data(data_nc, output_hour)
+                    elapsed_time = time.process_time() - start
+                    logging.info(f"Processing took {elapsed_time:.1f} seconds")
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)
@@ -147,16 +138,15 @@ def process_input(
                             f"Radiative transfer using {source} data "
                             f"for {site}, {date_i[:-2]}"
                         )
-                    input_era5 = prepare_era5_mod(
+                    input_era5 = prep.prepare_era5_mod(
                         era5_data_sfc, era5_data_pro, index, date_i
                     )
                     try:
-                        output_hour = call_rad_trans(input_era5, params)
+                        output_hour = call_rad_trans(input_era5, params, True)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
+                    data_nc = append_data(data_nc, output_hour)
 
     elif source == "era5" and config["era5"][:] == "pressure":
         if (stop_date - start_date).total_seconds() == 0.0:
@@ -184,14 +174,13 @@ def process_input(
                             f"Radiative transfer using {source} data "
                             f"for {site}, {date_i[:-2]}"
                         )
-                    input_era5 = prepare_era5_pres(era5_data, index, date_i)
+                    input_era5 = prep.prepare_era5_pres(era5_data, index, date_i)
                     try:
-                        output_hour = call_rad_trans(input_era5, params)
+                        output_hour = call_rad_trans(input_era5, params, True)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
+                    data_nc = append_data(data_nc, output_hour)
 
     elif source == "radiosonde":
         for date in date_range(start_date, stop_date):
@@ -206,37 +195,36 @@ def process_input(
                                 f"Radiative transfer using {source} data "
                                 f"for {site}, {date.strftime('%Y%m%d')}"
                             )
-                        input_rs = prepare_radiosonde(rs_data)
+                        input_rs = prep.prepare_radiosonde(rs_data)
                     try:
-                        output_hour = call_rad_trans(input_rs, params)
+                        output_hour = call_rad_trans(input_rs, params, True)
                     except ValueError:
                         logging.info(f"Skipping file {file}")
                         continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
+                    data_nc = append_data(data_nc, output_hour)
 
     elif source == "vaisala":
         for date in date_range(start_date, stop_date):
             file_name = get_file_list(
-                params["data_vs"], site + "_" + date.strftime("%Y%m%d")
+                params["data_vs"],
+                date.strftime("%Y%m%d"),
+                "nc",
             )
             for name in file_name:
                 if os.path.isfile(name):
                     with nc.Dataset(name) as vs_data:
-                        if name == file_name[0]:
+                        if "Height" in vs_data.variables:
                             logging.info(
                                 f"Radiative transfer using {source} data "
                                 f"for {site}, {date.strftime('%Y%m%d')}"
                             )
-                        input_vs = prepare_vaisala(vs_data, params["altitude"])
-                        input_vs["height"] -= params["altitude"]
-                    try:
-                        output_hour = call_rad_trans(input_vs, params)
-                    except ValueError:
-                        logging.info(f"Skipping file {file_name[0]}")
-                        continue
-                    for key, array in output_hour.items():
-                        data_nc = append_data(data_nc, key, array)
+                            input_vs = prep.prepare_vaisala(vs_data)
+                        try:
+                            output_hour = call_rad_trans(input_vs, params, True)
+                        except ValueError:
+                            logging.info(f"Skipping file {file_name[0]}")
+                            continue
+                        data_nc = append_data(data_nc, output_hour)
 
     elif source == "icon":
         for date in date_range(start_date, stop_date):
@@ -265,19 +253,18 @@ def process_input(
                                 f"Radiative transfer using {source} data "
                                 f"for {site}, {date_i[:-2]}"
                             )
-                        input_icon = prepare_icon(icon_data, index, date_i)
+                        input_icon = prep.prepare_icon(icon_data, index, date_i)
                         try:
-                            output_hour = call_rad_trans(input_icon, params)
+                            output_hour = call_rad_trans(input_icon, params, True)
                         except ValueError:
                             logging.info(f"Skipping time {date_i}")
                             continue
-                        for key, array in output_hour.items():
-                            data_nc = append_data(data_nc, key, array)
+                        data_nc = append_data(data_nc, output_hour)
 
     if source == "standard_atmosphere":
         logging.info(f"Radiative transfer using {source} data")
-        input_sa = prepare_standard_atmosphere()
-        data_nc = call_rad_trans(input_sa, params)
+        input_sa = prep.prepare_standard_atmosphere()
+        data_nc = call_rad_trans(input_sa, params, True)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
     data_nc["frequency"] = np.array(params["frequency"])
@@ -287,17 +274,37 @@ def process_input(
     return data_nc
 
 
-def call_rad_trans(data_in: dict, params: dict) -> dict:
+def call_ifs_multi(
+    ifs_data: dict, params: dict, date: datetime.date, index: int
+) -> dict:
+    output = {}
+    hour = ifs_data["time"][:-1][index]
+    date_i = datetime.datetime.combine(date, datetime.time(int(hour))).strftime(
+        "%Y%m%d%H"
+    )
+    if date_i[-2:] == "00":
+        logging.info(f"Radiative transfer for {date_i[:-2]}")
+    input_ifs = prep.prepare_ifs(ifs_data, index, date_i, params["ifs_height"])
+    if len(input_ifs) > 0:
+        try:
+            output = call_rad_trans(input_ifs, params)
+        except ValueError:
+            logging.info(f"Skipping time {date_i}")
+    return output
+
+
+def call_rad_trans(data_in: dict, params: dict, mp: bool = False) -> dict:
     # Channel bandwidth
     coeff_bdw = read_bandwidth_coefficients()
     # Antenna beamwidth
     ape_ang = read_beamwidth_coefficients()
-    data_in = check_height(data_in, params["altitude"])
+    data_in = prep.check_height(data_in, params["altitude"], 10.0)
     data_nc = rad_trans(
         data_in,
         params,
         coeff_bdw,
         ape_ang,
+        mp,
     )
     return data_nc
 

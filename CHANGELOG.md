@@ -1,3 +1,7 @@
+## 0.8.4 – 2026-01-07
+
+- Add multi-processing
+
 ## 0.8.3 – 2025-09-10
 
 - Improve plotting

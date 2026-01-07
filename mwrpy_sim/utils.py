@@ -16,6 +16,7 @@ Epoch = tuple[int, int, int]
 
 
 class MetaData(NamedTuple):
+    dimensions: tuple[str, ...]
     long_name: str
     units: str
     standard_name: str | None = None
@@ -23,21 +24,29 @@ class MetaData(NamedTuple):
     comment: str | None = None
 
 
-def append_data(data_in: dict, key: str, array: np.ndarray) -> dict:
+def append_data(data_in: dict, output_dict: dict) -> dict:
     """Appends data to a dictionary field (creates the field if not yet present).
 
     Args:
         data_in: Dictionary where data will be appended.
-        key: Key of the field.
-        array: Numpy array to be appended to data_in[key].
+        output_dict: Dictionary with data to append.
 
     """
     data = data_in.copy()
-    if key not in data:
-        data[key] = array
-    else:
-        data[key] = ma.concatenate((data[key], array))
+    for key, array in output_dict.items():
+        data[key] = array if key not in data else ma.concatenate((data[key], array))
     return data
+
+
+def dict_from_list(data_in: list) -> dict:
+    """Returns dictionary from stacked list."""
+    data_f: dict = {}
+    for ix in range(len(data_in)):
+        for key, array in data_in[ix].items():
+            data_f[key] = (
+                array if key not in data_f else ma.concatenate((data_f[key], array))
+            )
+    return data_f
 
 
 def get_file_list(path_to_files: str, key: str, ext: str = "nc") -> list[str]:
@@ -77,8 +86,8 @@ def _get_filename(
     return str(os.path.join(params["data_out"] + filename))
 
 
-def isodate2date(date_str: str) -> datetime.date:
-    return datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+def isodate2date(date_str: str, fmt: str = "%Y-%m-%d") -> datetime.date:
+    return datetime.datetime.strptime(date_str, fmt).date()
 
 
 def date_range(
@@ -110,10 +119,25 @@ def seconds2date(time_in_seconds: int, epoch: Epoch = (2001, 1, 1)) -> str:
 
 
 def seconds_since_epoch(date: str, epoch: Epoch = (1970, 1, 1)) -> int:
-    time_in_seconds = datetime.datetime.timestamp(
-        datetime.datetime(
-            *(int(date[0:4]), int(date[4:6]), int(date[6:8]), int(date[8:])),
-            tzinfo=timezone.utc,
+    time_in_seconds = (
+        datetime.datetime.timestamp(
+            datetime.datetime(
+                *(int(date[0:4]), int(date[4:6]), int(date[6:8]), int(date[8:])),
+                tzinfo=timezone.utc,
+            )
+        )
+        if len(date) == 10
+        else datetime.datetime.timestamp(
+            datetime.datetime(
+                *(
+                    int(date[0:4]),
+                    int(date[4:6]),
+                    int(date[6:8]),
+                    int(date[8:10]),
+                    int(date[10:]),
+                ),
+                tzinfo=timezone.utc,
+            )
         )
     )
     epoch_in_seconds = datetime.datetime.timestamp(

@@ -147,7 +147,7 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
         histtype="step",
         log=True,
     )
-    ax.set_ylim([np.min([np.min(h[0]), 1e-1]), np.max([np.max(h[0]), 1e0])])
+    ax.set_ylim([np.nanmin([np.nanmin(h[0]), 1e-1]), np.nanmax([np.nanmax(h[0]), 1e0])])
     ax.yaxis.set_minor_locator(plt.NullLocator())
     ax.text(
         0.1,

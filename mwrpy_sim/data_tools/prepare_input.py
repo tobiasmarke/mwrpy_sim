@@ -1,5 +1,6 @@
 """Prepare input data for MWRPy sim."""
 
+import datetime
 import os
 
 import metpy.calc
@@ -21,8 +22,15 @@ from mwrpy_sim.atmos import (
 from mwrpy_sim.utils import seconds_since_epoch
 
 
-def prepare_ifs(ifs_data: nc.Dataset, index: int, date_i: str, hasl: float) -> dict:
+def prepare_ifs(ifs_data: dict, index: int, date_i: str, hasl: float) -> dict:
     """Prepare input data from ECMWF's IFS model (Cloudnet format)."""
+    # print(
+    #     metpy.calc.add_pressure_to_height(
+    #         0 * units.meters,
+    #         np.mean(ifs_data["sfc_pressure_amsl"][:].data
+    #                 - ifs_data["sfc_pressure"][:].data)*units.Pa
+    #     )
+    # )
     input_ifs = {
         "height": ifs_data["height"][index, :] + hasl,
         "air_temperature": ifs_data["temperature"][index, :],
@@ -129,28 +137,43 @@ def prepare_radiosonde(rs_data: nc.Dataset) -> dict:
     return _add_std_atm(input_rs)
 
 
-def prepare_vaisala(vs_data: nc.Dataset, altitude: float) -> dict:
+def prepare_vaisala(vs_data: nc.Dataset, altitude: float = 0.0) -> dict:
     """Prepare input data from JOYCE Vaisala radiosonde measurements."""
-    input_vs: dict = {}
-    geopotential = units.Quantity(vs_data["alt"][:] * con.g0, "m^2/s^2")
-    input_vs["height"] = metpy.calc.geopotential_to_height(geopotential[:]).magnitude
-    input_vs["height"] = input_vs["height"][0, :]
-    input_vs["air_temperature"] = vs_data.variables["ta"][0, :]
-    input_vs["air_pressure"] = vs_data.variables["p"][0, :]
-    input_vs["relative_humidity"] = vs_data["rh"][0, :] / 100.0
-    input_vs["time"] = np.array(
-        seconds_since_epoch(
-            vs_data.date_YYYYMMDDTHHMM[0:8] + vs_data.date_YYYYMMDDTHHMM[9:11]
+    ind = np.where(np.diff(vs_data["Height"][:]) < 0)[0]
+    ind_h = len(vs_data["Height"][:]) - 1 if len(ind) == 0 else ind[0]
+    input_vs: dict = {
+        "height": np.append(
+            vs_data["Height"][:ind_h][:100], vs_data["Height"][:ind_h][100:][0::10]
+        )
+        + altitude,
+        "air_temperature": np.append(
+            vs_data["Temperature"][:ind_h][:100],
+            vs_data["Temperature"][:ind_h][100:][0::10],
         ),
-        dtype=np.int64,
-    )
+        "air_pressure": np.append(
+            vs_data["Pressure"][:ind_h][:100], vs_data["Pressure"][:ind_h][100:][0::10]
+        )
+        * 100.0,
+        "relative_humidity": np.append(
+            vs_data["Humidity"][:ind_h][:100], vs_data["Humidity"][:ind_h][100:][0::10]
+        )
+        / 100,
+        "time": np.array(
+            seconds_since_epoch(
+                datetime.datetime.strptime(
+                    vs_data["Time"][0][:19], "%Y-%m-%dT%H:%M:%S"
+                ).strftime("%Y%m%d%H%M")
+            ),
+            dtype=np.int64,
+        ),
+    }
 
-    return _add_std_atm(input_vs)
+    return _add_std_atm(input_vs, 50.0)
 
 
 def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
     """Prepare input data from ICON model (METEOGRAM)."""
-    input_icon = {
+    input_icon: dict = {
         "height": np.flip(icon_data["height_2"][:]) - icon_data["height_2"][-1],
         "air_temperature": np.flip(icon_data["T"][index, :]),
         "air_pressure": np.flip(icon_data["P"][index, :]),

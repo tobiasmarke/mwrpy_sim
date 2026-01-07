@@ -1,3 +1,6 @@
+import multiprocessing
+from functools import partial
+
 import numpy as np
 
 from mwrpy_sim.data_tools.cloud_mod import (
@@ -15,6 +18,7 @@ def rad_trans(
     params: dict,
     coeff_bdw: dict,
     ape_ang: np.ndarray,
+    mp: bool,
 ) -> dict:
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = -999.0
@@ -72,23 +76,42 @@ def rad_trans(
             tb_clr, irt_clr = np.copy(tb_pro), np.copy(irt_pro)
         else:
             # MW radiative transport
-            tb_tmp = np.array(
-                [
-                    calc_mw_rt(
-                        input_dat["height"][:],
-                        input_dat["air_temperature"][:],
-                        input_dat["air_pressure"][:] / 100.0,
-                        input_dat["e"],
-                        lwc_tmp,
-                        ang,
-                        np.array(params["frequency"]),
-                        coeff_bdw,
-                        ape_ang,
-                    )
-                    for _, ang in enumerate(theta)
-                ],
-                np.float32,
-            ).T
+            if len(theta) > 1:
+                pool = multiprocessing.Pool()
+                func = partial(
+                    calc_mw_rt,
+                    input_dat["height"][:],
+                    input_dat["air_temperature"][:],
+                    input_dat["air_pressure"][:] / 100.0,
+                    input_dat["e"],
+                    lwc_tmp,
+                    np.array(params["frequency"]),
+                    coeff_bdw,
+                    False,
+                    ape_ang,
+                )
+                tb_tmp = np.squeeze(np.array([pool.map(func, theta)], np.float32).T)
+                pool.close()
+                pool.join()
+            else:
+                tb_tmp = np.array(
+                    [
+                        calc_mw_rt(
+                            input_dat["height"][:],
+                            input_dat["air_temperature"][:],
+                            input_dat["air_pressure"][:] / 100.0,
+                            input_dat["e"],
+                            lwc_tmp,
+                            np.array(params["frequency"]),
+                            coeff_bdw,
+                            mp,
+                            ape_ang,
+                            ang,
+                        )
+                        for _, ang in enumerate(theta)
+                    ],
+                    np.float32,
+                ).T
 
             # IR radiative transport (for zenith only)
             irt_tmp = (
