@@ -65,10 +65,6 @@ params:
       9000.0000,
       9500.0000,
       10000.000,
-      15000.000,
-      20000.000,
-      25000.000,
-      30000.000,
     ]
   lat_res: 0.1 # latitude resolution with which to get data in deg. should be multiple for model resolution
   lon_res: 0.1 # longitude resolution with which to get data in deg. should be multiple of model resolution

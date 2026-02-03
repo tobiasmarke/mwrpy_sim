@@ -48,8 +48,8 @@ def rad_trans(
             lwc_tmp, lwp_tmp, base_tmp, top_tmp = (
                 np.zeros(len(input_dat["height"][:]), np.float32),
                 0.0,
-                np.empty(0, np.float32),
-                np.ones(1, np.float32) * FillValue,
+                np.zeros(15, np.int32),
+                np.zeros(15, np.int32),
             )
         else:
             top_tmp, base_tmp = (
@@ -67,6 +67,11 @@ def rad_trans(
                 get_cloud_prop(base_tmp, top_tmp, input_dat, method)
                 if len(top_tmp) in np.linspace(1, 15, 15)
                 else (np.zeros(len(input_dat["height"][:]), np.float32), 0.0)
+            )
+            top_tmp, base_tmp = (
+                (np.zeros(15, np.int32), np.zeros(15, np.int32))
+                if len(top_tmp) not in np.linspace(1, 15, 15)
+                else (top_tmp, base_tmp)
             )
 
         # Avoid extra "clear" RT calculation for cases without liquid water
