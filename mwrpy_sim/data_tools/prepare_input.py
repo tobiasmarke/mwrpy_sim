@@ -321,7 +321,7 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 5.0) -> d
 
     elif np.abs(delta_z) > tolerance and delta_z > -150.0:
         # Extrapolate the first part of the profile (< 1000 m)
-        ind_h = input_dict["height"] <= 1000.0
+        ind_h = input_dict["height"] - input_dict["height"][0] <= 1000.0
         height_new = (
             input_dict["height"][ind_h]
             - delta_z
