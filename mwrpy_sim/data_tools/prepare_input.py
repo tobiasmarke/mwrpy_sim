@@ -7,7 +7,7 @@ import metpy.calc
 import netCDF4 as nc
 import numpy as np
 from metpy.units import units
-from scipy.interpolate import make_interp_spline
+from scipy.interpolate import CubicSpline
 
 import mwrpy_sim.constants as con
 from mwrpy_sim.atmos import (
@@ -22,15 +22,18 @@ from mwrpy_sim.atmos import (
 from mwrpy_sim.utils import seconds_since_epoch
 
 
-def prepare_ifs(ifs_data: dict, index: int, date_i: str, hasl: float) -> dict:
+def prepare_ifs(ifs_data: dict, index: int, date_i: str) -> dict:
     """Prepare input data from ECMWF's IFS model (Cloudnet format)."""
-    # print(
-    #     metpy.calc.add_pressure_to_height(
-    #         0 * units.meters,
-    #         np.mean(ifs_data["sfc_pressure_amsl"][:].data
-    #                 - ifs_data["sfc_pressure"][:].data)*units.Pa
-    #     )
-    # )
+    hasl = (
+        metpy.calc.add_pressure_to_height(
+            0 * units.meters,
+            np.mean(
+                ifs_data["sfc_pressure_amsl"][:].data - ifs_data["sfc_pressure"][:].data
+            )
+            * units.Pa,
+        ).magnitude
+        * 1000.0
+    )
     input_ifs = {
         "height": ifs_data["height"][index, :] + hasl,
         "air_temperature": ifs_data["temperature"][index, :],
@@ -272,8 +275,10 @@ def _add_vars(input_dat) -> dict:
             input_dat["air_pressure"][0],
             input_dat["height"][:],
         )
+    for key in input_dat.keys():
+        input_dat[key] = np.ma.asarray(input_dat[key])
     if "iwv" not in input_dat:
-        input_dat["iwv"] = np.array(
+        input_dat["iwv"] = np.ma.array(
             [
                 hum_to_iwv(
                     input_dat["absolute_humidity"][:],
@@ -288,7 +293,7 @@ def _add_vars(input_dat) -> dict:
     return input_dat
 
 
-def check_height(input_dict: dict, altitude: float, tolerance: float = 100.0) -> dict:
+def check_height(input_dict: dict, altitude: float, tolerance: float = 5.0) -> dict:
     """Compare input data height with altitude and cut/extrapolate if necessary.
     In addition, calculate integrated water vapor (iwv) from absolute humidity.
 
@@ -298,13 +303,14 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 100.0) ->
     altitude : float
         Altitude to compare with the input data height.
     tolerance : float, optional
-        Tolerance for the height comparison, by default 100 m.
+        Tolerance for the height comparison, by default 5 m.
 
     Returns:
     dict
         Updated input data dictionary with height adjusted to the specified altitude.
     """
-    if input_dict["height"][0] - altitude < -tolerance:
+    delta_z = input_dict["height"][0] - altitude
+    if delta_z < -150.0:
         # Cut off the first part of the profile
         for key in input_dict:
             if key not in ("height", "time") and len(input_dict[key]) == len(
@@ -313,18 +319,30 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 100.0) ->
                 input_dict[key] = input_dict[key][input_dict["height"][:] >= altitude]
         input_dict["height"] = input_dict["height"][input_dict["height"][:] >= altitude]
 
-    elif input_dict["height"][0] - altitude > tolerance:
-        # Extrapolate the first part of the profile
+    elif np.abs(delta_z) > tolerance and delta_z > -150.0:
+        # Extrapolate the first part of the profile (< 1000 m)
+        ind_h = input_dict["height"] <= 1000.0
+        height_new = (
+            input_dict["height"][ind_h]
+            - delta_z
+            + np.linspace(0, 1, len(input_dict["height"][ind_h])) * delta_z
+        )
         for key in input_dict:
-            if key != "height" and len(input_dict[key]) == len(input_dict["height"]):
-                input_dict[key] = np.insert(
-                    input_dict[key][:],
-                    0,
-                    make_interp_spline(input_dict["height"][:4], input_dict[key][:4])(
-                        np.array([altitude])
-                    ),
+            if key not in ("height", "time") and len(input_dict[key]) == len(
+                input_dict["height"]
+            ):
+                f = CubicSpline(
+                    input_dict["height"][ind_h],
+                    input_dict[key][ind_h],
+                    bc_type="natural",
                 )
-        input_dict["height"] = np.insert(input_dict["height"], 0, altitude)
+                input_dict[key] = np.ma.asarray(
+                    np.concatenate([f(height_new), input_dict[key][~ind_h].data])
+                )
+        input_dict["lwc_in"][input_dict["lwc_in"] < 1e-8] = 0.0
+        input_dict["height"] = np.concatenate(
+            [height_new, input_dict["height"][~ind_h]]
+        )
 
     # Calculate integrated water vapor (iwv) from absolute humidity
     input_dict["iwv"] = np.array(

@@ -89,7 +89,6 @@ def process_input(
                         var: np.squeeze(ifs_data.variables[var][:])
                         for var in ifs_data.variables
                     }
-                    start = time.process_time()
                     pool = multiprocessing.Pool()
                     func = partial(call_ifs_multi, ifs_dict, params, date)
                     output_hour = dict_from_list(
@@ -100,8 +99,6 @@ def process_input(
                     pool.close()
                     pool.join()
                     data_nc = append_data(data_nc, output_hour)
-                    elapsed_time = time.process_time() - start
-                    logging.info(f"Processing took {elapsed_time:.1f} seconds")
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)
@@ -284,7 +281,7 @@ def call_ifs_multi(
     )
     if date_i[-2:] == "00":
         logging.info(f"Radiative transfer for {date_i[:-2]}")
-    input_ifs = prep.prepare_ifs(ifs_data, index, date_i, params["ifs_height"])
+    input_ifs = prep.prepare_ifs(ifs_data, index, date_i)
     if len(input_ifs) > 0:
         try:
             output = call_rad_trans(input_ifs, params)
@@ -298,7 +295,7 @@ def call_rad_trans(data_in: dict, params: dict, mp: bool = False) -> dict:
     coeff_bdw = read_bandwidth_coefficients()
     # Antenna beamwidth
     ape_ang = read_beamwidth_coefficients()
-    data_in = prep.check_height(data_in, params["altitude"], 10.0)
+    data_in = prep.check_height(data_in, params["altitude"], 5.0)
     data_nc = rad_trans(
         data_in,
         params,
