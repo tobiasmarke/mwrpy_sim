@@ -1,6 +1,4 @@
 import numpy as np
-import xarray as xr
-from openMWR.run_RT import _run_IR_date
 from torchMWRT import AtmProfile, RTModel
 
 from mwrpy_sim.data_tools.cloud_mod import (
@@ -9,13 +7,13 @@ from mwrpy_sim.data_tools.cloud_mod import (
     get_cloud_prop,
 )
 from mwrpy_sim.data_tools.stability_indices import calc_stability_indices
+from mwrpy_sim.rad_trans.rad_trans_ir import run_rad_trans_ir
 from mwrpy_sim.utils import read_config
 
 
 def rad_trans(
     input_dat: dict,
     params: dict,
-    site: str,
 ) -> dict:
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = -999.0
@@ -97,19 +95,7 @@ def rad_trans(
             tb_tmp = ds["tbtotal"].values
 
             if config["calc_ir"]:
-                ds2 = xr.Dataset(
-                    data_vars=dict(
-                        T=(["height"], input_dat["air_temperature"][:]),
-                        p=(["height"], input_dat["air_pressure"][:] / 100.0),
-                        rh=(["height"], input_dat["relative_humidity"][:] * 100.0),
-                        lwc=(["height"], lwc_tmp * 1000.0),
-                    ),
-                    coords=dict(
-                        height=("height", input_dat["height"][:]),
-                    ),
-                )
-                data_dir = "./mwrpy_sim/rad_trans/openMWR/"
-                irt_tmp = _run_IR_date(ds2, site, data_dir)
+                irt_tmp = run_rad_trans_ir(input_dat, lwc_tmp, params)
             else:
                 irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
 

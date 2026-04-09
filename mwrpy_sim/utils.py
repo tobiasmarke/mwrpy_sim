@@ -1,5 +1,6 @@
 import datetime
 import glob
+import json
 import logging
 import os
 from datetime import timezone
@@ -208,3 +209,17 @@ def get_date_from_past(n: int, reference_date: str | None = None) -> str:
     reference = reference_date or get_time().split()[0]
     the_date = date_string_to_date(reference) - datetime.timedelta(n)
     return str(the_date)
+
+
+def loadCoeffsJSON(path) -> dict:
+    """Load coefficients required for O2 absorption."""
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf8") as f:
+            try:
+                var_all = {**json.load(f)}
+                for key in var_all.keys():
+                    var_all[key] = np.asarray(var_all[key])
+            except json.decoder.JSONDecodeError:
+                print(path)
+                raise
+    return {**var_all}

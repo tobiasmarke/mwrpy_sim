@@ -103,9 +103,7 @@ def process_input(
                                 ~input_ifs["air_temperature"].mask
                             ):
                                 try:
-                                    output_hour = call_rad_trans(
-                                        input_ifs, params, site
-                                    )
+                                    output_hour = call_rad_trans(input_ifs, params)
                                 except ValueError:
                                     logging.info(f"Skipping time {date_i}")
                                 data_nc = append_data(data_nc, output_hour)
@@ -149,7 +147,7 @@ def process_input(
                         era5_data_sfc, era5_data_pro, index, date_i
                     )
                     try:
-                        output_hour = call_rad_trans(input_era5, params, site)
+                        output_hour = call_rad_trans(input_era5, params)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
@@ -183,7 +181,7 @@ def process_input(
                         )
                     input_era5 = prep.prepare_era5_pres(era5_data, index, date_i)
                     try:
-                        output_hour = call_rad_trans(input_era5, params, site)
+                        output_hour = call_rad_trans(input_era5, params)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
@@ -204,7 +202,7 @@ def process_input(
                             )
                         input_rs = prep.prepare_radiosonde(rs_data)
                     try:
-                        output_hour = call_rad_trans(input_rs, params, site)
+                        output_hour = call_rad_trans(input_rs, params)
                     except ValueError:
                         logging.info(f"Skipping file {file}")
                         continue
@@ -227,7 +225,7 @@ def process_input(
                             )
                             input_vs = prep.prepare_vaisala(vs_data)
                         try:
-                            output_hour = call_rad_trans(input_vs, params, site)
+                            output_hour = call_rad_trans(input_vs, params)
                         except ValueError:
                             logging.info(f"Skipping file {file_name[0]}")
                             continue
@@ -262,7 +260,7 @@ def process_input(
                             )
                         input_icon = prep.prepare_icon(icon_data, index, date_i)
                         try:
-                            output_hour = call_rad_trans(input_icon, params, site)
+                            output_hour = call_rad_trans(input_icon, params)
                         except ValueError:
                             logging.info(f"Skipping time {date_i}")
                             continue
@@ -271,7 +269,7 @@ def process_input(
     if source == "standard_atmosphere":
         logging.info(f"Radiative transfer using {source} data")
         input_sa = prep.prepare_standard_atmosphere()
-        data_nc = call_rad_trans(input_sa, params, site)
+        data_nc = call_rad_trans(input_sa, params)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
     data_nc["frequency"] = np.array(params["frequency"])
@@ -281,12 +279,11 @@ def process_input(
     return data_nc
 
 
-def call_rad_trans(data_in: dict, params: dict, site: str) -> dict:
+def call_rad_trans(data_in: dict, params: dict) -> dict:
     data_in = prep.check_height(data_in, params["altitude"], 5.0)
     data_nc = rad_trans(
         data_in,
         params,
-        site,
     )
     return data_nc
 
