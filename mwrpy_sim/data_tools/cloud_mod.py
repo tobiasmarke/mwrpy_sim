@@ -108,7 +108,7 @@ def adiab(i, T, P, z):
     #   Compute adiabatic LWC by integration from cloud base to level I
 
     TCL = T[0]
-    LWC = 0.0
+    LWC = np.array([0.0])
 
     for j in range(1, i + 1):
         deltaz = z[j] - z[j - 1]
@@ -148,7 +148,7 @@ def adiab(i, T, P, z):
             * deltaz
         )
 
-    return LWC
+    return LWC[0]
 
 
 def mod_ad(T_cloud, p_cloud, z_cloud):
@@ -224,10 +224,12 @@ def get_cloud_prop(
     """Calculate cloud properties."""
     if method == "prognostic":
         lwc_new, height_new = input_dat["lwc_in"][:], input_dat["height"][:]
-        lwp = np.sum(
-            (input_dat["lwc_in"][1:] + input_dat["lwc_in"][:-1])
-            / 2.0
-            * np.diff(input_dat["height"][:])
+        lwp = float(
+            np.sum(
+                (input_dat["lwc_in"][1:] + input_dat["lwc_in"][:-1])
+                / 2.0
+                * np.diff(input_dat["height"][:])
+            )
         )
     else:
         lwc, cloud_new = np.empty(0, np.float64), np.empty(0, np.float64)
@@ -243,7 +245,7 @@ def get_cloud_prop(
                     input_dat["air_pressure"][xcl],
                     input_dat["height"][xcl],
                 )
-                lwp += np.sum(lwcx * np.diff(input_dat["height"][xcl]))
+                lwp += float(np.sum(lwcx * np.diff(input_dat["height"][xcl])))
                 cloud_new = np.hstack((cloud_new, cloudx))
                 lwc = np.hstack((lwc, lwcx))
                 if len(height_new) == 0:
@@ -274,5 +276,6 @@ def get_cloud_prop(
             )
             lwc_new[xx] = lwc[yy]
 
-    lwc_in = np.interp(input_dat["height"][:], height_new, lwc_new)
+    lwc_in = np.zeros(len(input_dat["height"][:]), np.float32)
+    lwc_in[:] = np.interp(input_dat["height"][:], height_new, lwc_new)
     return lwc_in, lwp

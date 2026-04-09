@@ -1,11 +1,9 @@
 import datetime
 import glob
-import json
 import logging
 import os
-import warnings
 from datetime import timezone
-from typing import Any, Iterator, Literal, NamedTuple, Tuple
+from typing import Any, Iterator, Literal, NamedTuple
 
 import numpy as np
 import yaml
@@ -36,17 +34,6 @@ def append_data(data_in: dict, output_dict: dict) -> dict:
     for key, array in output_dict.items():
         data[key] = array if key not in data else ma.concatenate((data[key], array))
     return data
-
-
-def dict_from_list(data_in: list) -> dict:
-    """Returns dictionary from stacked list."""
-    data_f: dict = {}
-    for ix in range(len(data_in)):
-        for key, array in data_in[ix].items():
-            data_f[key] = (
-                array if key not in data_f else ma.concatenate((data_f[key], array))
-            )
-    return data_f
 
 
 def get_file_list(path_to_files: str, key: str, ext: str = "nc") -> list[str]:
@@ -197,50 +184,6 @@ def _read_site_config_yaml(site: str) -> dict:
         return yaml.load(f, Loader=SafeLoader)
 
 
-def read_bandwidth_coefficients() -> dict:
-    coeff_bdw: dict = {}
-
-    path = (
-        os.path.dirname(os.path.realpath(__file__))
-        + "/rad_trans/coeff/o2_bandpass_interp_freqs.json"
-    )
-    FFI = loadCoeffsJSON(path)
-    coeff_bdw["bdw_fre"] = FFI["FFI"].T
-
-    path = (
-        os.path.dirname(os.path.realpath(__file__))
-        + "/rad_trans/coeff/o2_bandpass_interp_norm_resp.json"
-    )
-    FRIN = loadCoeffsJSON(path)
-    coeff_bdw["bdw_wgh"] = FRIN["FRIN"].T
-
-    coeff_bdw["f_all"], coeff_bdw["ind1"] = (
-        np.empty(0, np.float32),
-        np.zeros(1, np.int32),
-    )
-    for ff in range(7):
-        ifr = np.where(coeff_bdw["bdw_wgh"][ff, :] > 0.0)[0]
-        coeff_bdw["f_all"] = np.hstack(
-            (coeff_bdw["f_all"], coeff_bdw["bdw_fre"][ff, ifr])
-        )
-        coeff_bdw["ind1"] = np.hstack(
-            (
-                coeff_bdw["ind1"],
-                coeff_bdw["ind1"][ff] + len(ifr),
-            )
-        )
-
-    return coeff_bdw
-
-
-def read_beamwidth_coefficients() -> np.ndarray:
-    ape_ini = np.linspace(-9.9, 9.9, 199)
-    ape_ang = ape_ini[GAUSS(ape_ini, 0.0) > 1e-3]
-    ape_ang = ape_ang[ape_ang >= 0.0]
-
-    return ape_ang
-
-
 def date_string_to_date(date_string: str) -> datetime.date:
     """Convert YYYY-MM-DD to Python date."""
     date_arr = [int(x) for x in date_string.split("-")]
@@ -265,109 +208,3 @@ def get_date_from_past(n: int, reference_date: str | None = None) -> str:
     reference = reference_date or get_time().split()[0]
     the_date = date_string_to_date(reference) - datetime.timedelta(n)
     return str(the_date)
-
-
-def loadCoeffsJSON(path) -> dict:
-    """Load coefficients required for O2 absorption."""
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf8") as f:
-            try:
-                var_all = {**json.load(f)}
-                for key in var_all.keys():
-                    var_all[key] = np.asarray(var_all[key])
-            except json.decoder.JSONDecodeError:
-                print(path)
-                raise
-    return {**var_all}
-
-
-def dcerror(x, y):
-    """SIXTH-ORDER APPROX TO THE COMPLEX ERROR FUNCTION OF z=X+iY."""
-    a = [
-        122.607931777104326,
-        214.382388694706425,
-        181.928533092181549,
-        93.155580458138441,
-        30.180142196210589,
-        5.912626209773153,
-        0.564189583562615,
-    ]
-    b = [
-        122.607931773875350,
-        352.730625110963558,
-        457.334478783897737,
-        348.703917719495792,
-        170.354001821091472,
-        53.992906912940207,
-        10.479857114260399,
-    ]
-
-    ZH = complex(np.abs(y), -x)
-    ASUM = (
-        ((((a[6] * ZH + a[5]) * ZH + a[4]) * ZH + a[3]) * ZH + a[2]) * ZH + a[1]
-    ) * ZH + a[0]
-    BSUM = (
-        (((((ZH + b[6]) * ZH + b[5]) * ZH + b[4]) * ZH + b[3]) * ZH + b[2]) * ZH + b[1]
-    ) * ZH + b[0]
-    w = ASUM / BSUM
-    if y >= 0:
-        DCERROR = w
-    else:
-        DCERROR = 2.0 * np.exp(-(complex(x, y) ** 2)) - w
-
-    return DCERROR
-
-
-def GAUSS(ape_ang, theta):
-    ape_sigma = (2.35 * 0.5) / np.sqrt(-1.0 * np.log(0.5))
-    arg = np.abs((ape_ang - theta) / ape_sigma)
-    arg = arg[arg < 9.0]
-
-    return np.exp(-arg * arg / 2.0) * arg
-
-
-def exponential_integration(
-    zeroflg: bool, x: np.ndarray, ds: np.ndarray, ibeg: int, iend: int, factor: float
-) -> Tuple[float, np.ndarray]:
-    """EXPonential INTegration: Integrate the profile in array x over the
-    layers defined in array ds, saving the integrals over each layer.
-
-    Args:
-        zeroflg (bool): Flag to handle zero values (0:layer=0, 1:layer=avg).
-        x (numpy.ndarray): Profile array.
-        ds (numpy.ndarray): Array of layer depths (km).
-        ibeg (int): Lower integration limit (profile level number).
-        iend (int): Upper integration limit (profile level number).
-        factor (float): Factor by which result is multiplied (e.g., unit change).
-
-    Returns:
-        Tuple[float, numpy.ndarray]:
-        * xds (numpy.ndarray): Array containing integrals over each layer ds
-        * sxds (numpy.ndarray): Integral of x*ds over levels ibeg to iend
-    adapted from pyrtlib
-    """
-    sxds = 0.0
-    xds = np.zeros(ds.shape)
-    for i in range(ibeg, iend):
-        # Check for negative x value. If found, output message and return.
-        if x[i - 1] < 0.0 or x[i] < 0.0:
-            warnings.warn("Error encountered in exponential_integration")
-            return sxds, xds
-            # Find a layer value for x in cases where integration algorithm fails.
-        if np.abs(x[i] - x[i - 1]) < 1e-09:
-            xlayer = x[i]
-        elif x[i - 1] == 0.0 or x[i] == 0.0:
-            if not zeroflg:
-                xlayer = 0.0
-            else:
-                xlayer = np.dot((x[i] + x[i - 1]), 0.5)
-        else:
-            # Find a layer value for x assuming exponential decay over the layer.
-            xlayer = (x[i] - x[i - 1]) / np.log(x[i] / x[i - 1])
-        # Integrate x over the layer and save the result in xds.
-        xds[i] = np.dot(xlayer, ds[i])
-        sxds = sxds + xds[i]
-
-    sxds = np.dot(sxds, factor)
-
-    return sxds, xds.reshape(iend)

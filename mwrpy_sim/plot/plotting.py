@@ -149,15 +149,15 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
     )
     ax.set_ylim(
         [
-            np.nanmin([np.max([np.nanmin(h[0]), 1e-2]), 1e-1]),
-            np.nanmax([np.max([np.nanmax(h[0]), 1e-1]), 1e0]),
+            np.min([np.nanmin(h[0][h[0] > 0.0], initial=1e-1), 1e-1]),
+            np.max([np.nanmax(h[0][h[0] > 0.0], initial=1e0), 1e0]),
         ]
     )
     ax.yaxis.set_minor_locator(plt.NullLocator())
     ax.text(
         0.1,
         0.8,
-        f"mean: {np.ma.mean(data):.2f} {meta.xlabel}\n",
+        f"mean: {str(np.round(np.ma.mean(data), 2))} {meta.xlabel}\n",
         transform=ax.transAxes,
         fontsize=12,
     )
@@ -184,7 +184,7 @@ def _plot_profile(
         ax.text(
             0.025,
             0.9,
-            f"mean first CBH: {np.ma.mean(m_cbh[:, 0]):.2f} m",
+            f"mean first CBH: {str(np.round(np.ma.mean(m_cbh[:, 0]), 2))} m",
             transform=ax.transAxes,
             fontsize=12,
             verticalalignment="top",

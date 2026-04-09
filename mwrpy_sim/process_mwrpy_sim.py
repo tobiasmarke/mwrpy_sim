@@ -1,12 +1,11 @@
 import datetime
 import logging
-import multiprocessing
 import os
-import time
-from functools import partial
+import shutil
 
 import netCDF4 as nc
 import numpy as np
+from openMWR.site import create_site
 
 from mwrpy_sim import sim_mwr
 from mwrpy_sim.data_tools import prepare_input as prep
@@ -18,12 +17,9 @@ from mwrpy_sim.utils import (
     _get_filename,
     append_data,
     date_range,
-    dict_from_list,
     get_file_list,
     get_processing_dates,
     isodate2date,
-    read_bandwidth_coefficients,
-    read_beamwidth_coefficients,
     read_config,
     seconds2date,
 )
@@ -31,13 +27,17 @@ from mwrpy_sim.utils import (
 
 def main(args):
     logging.basicConfig(level="INFO")
-    start = time.process_time()
+    logging.info(f"Processing started at {str(datetime.datetime.now()).split('.')[0]}")
     _start_date, _stop_date = get_processing_dates(args)
     start_date = isodate2date(_start_date)
     stop_date = isodate2date(_stop_date)
     global_specs = read_config(args.site, "global_specs")
     params = read_config(args.site, "params")
     file_name = _get_filename(args.source, start_date, stop_date, args.site)
+    data_dir = "./mwrpy_sim/rad_trans/openMWR/"
+    os.makedirs(data_dir, exist_ok=True)
+    if global_specs["calc_ir"]:
+        create_site(args.site, data_dir=data_dir, gen=params["gen"])
     if args.command == "get_era5":
         era5_request(args.site, params, start_date, stop_date)
     elif args.command in ("process", "no-plot"):
@@ -64,8 +64,8 @@ def main(args):
                 args.stop,
                 params["plot_pth"],
             )
-    elapsed_time = time.process_time() - start
-    logging.info(f"Processing took {elapsed_time:.1f} seconds")
+    shutil.rmtree(data_dir, ignore_errors=True)
+    logging.info(f"Processing ended at {str(datetime.datetime.now()).split('.')[0]}")
 
 
 def process_input(
@@ -85,20 +85,30 @@ def process_input(
             file_name = get_file_list(data_in, "ecmwf")
             if len(file_name) == 1:
                 with nc.Dataset(file_name[0]) as ifs_data:
-                    ifs_dict = {
-                        var: np.squeeze(ifs_data.variables[var][:])
-                        for var in ifs_data.variables
-                    }
-                    pool = multiprocessing.Pool()
-                    func = partial(call_ifs_multi, ifs_dict, params, date)
-                    output_hour = dict_from_list(
-                        pool.map(
-                            func, np.arange(len(ifs_data["time"][:-1])), chunksize=2
-                        )
-                    )
-                    pool.close()
-                    pool.join()
-                    data_nc = append_data(data_nc, output_hour)
+                    if len(ifs_data["time"]) == 25 and np.all(
+                        ~ifs_data["temperature"][:-1, 0].mask
+                    ):
+                        ifs_dict = {
+                            var: np.squeeze(ifs_data.variables[var][:])
+                            for var in ifs_data.variables
+                        }
+                        for index, hour in enumerate(ifs_dict["time"][:-1]):
+                            date_i = datetime.datetime.combine(
+                                date, datetime.time(int(hour))
+                            ).strftime("%Y%m%d%H")
+                            if date_i[-2:] == "00":
+                                logging.info(f"Radiative transfer for {date_i[:-2]}")
+                            input_ifs = prep.prepare_ifs(ifs_dict, index, date_i)
+                            if len(input_ifs) > 0 and np.all(
+                                ~input_ifs["air_temperature"].mask
+                            ):
+                                try:
+                                    output_hour = call_rad_trans(
+                                        input_ifs, params, site
+                                    )
+                                except ValueError:
+                                    logging.info(f"Skipping time {date_i}")
+                                data_nc = append_data(data_nc, output_hour)
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)
@@ -139,7 +149,7 @@ def process_input(
                         era5_data_sfc, era5_data_pro, index, date_i
                     )
                     try:
-                        output_hour = call_rad_trans(input_era5, params, True)
+                        output_hour = call_rad_trans(input_era5, params, site)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
@@ -173,7 +183,7 @@ def process_input(
                         )
                     input_era5 = prep.prepare_era5_pres(era5_data, index, date_i)
                     try:
-                        output_hour = call_rad_trans(input_era5, params, True)
+                        output_hour = call_rad_trans(input_era5, params, site)
                     except ValueError:
                         logging.info(f"Skipping time {date_i}")
                         continue
@@ -194,7 +204,7 @@ def process_input(
                             )
                         input_rs = prep.prepare_radiosonde(rs_data)
                     try:
-                        output_hour = call_rad_trans(input_rs, params, True)
+                        output_hour = call_rad_trans(input_rs, params, site)
                     except ValueError:
                         logging.info(f"Skipping file {file}")
                         continue
@@ -217,7 +227,7 @@ def process_input(
                             )
                             input_vs = prep.prepare_vaisala(vs_data)
                         try:
-                            output_hour = call_rad_trans(input_vs, params, True)
+                            output_hour = call_rad_trans(input_vs, params, site)
                         except ValueError:
                             logging.info(f"Skipping file {file_name[0]}")
                             continue
@@ -252,7 +262,7 @@ def process_input(
                             )
                         input_icon = prep.prepare_icon(icon_data, index, date_i)
                         try:
-                            output_hour = call_rad_trans(input_icon, params, True)
+                            output_hour = call_rad_trans(input_icon, params, site)
                         except ValueError:
                             logging.info(f"Skipping time {date_i}")
                             continue
@@ -261,7 +271,7 @@ def process_input(
     if source == "standard_atmosphere":
         logging.info(f"Radiative transfer using {source} data")
         input_sa = prep.prepare_standard_atmosphere()
-        data_nc = call_rad_trans(input_sa, params, True)
+        data_nc = call_rad_trans(input_sa, params, site)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
     data_nc["frequency"] = np.array(params["frequency"])
@@ -271,37 +281,12 @@ def process_input(
     return data_nc
 
 
-def call_ifs_multi(
-    ifs_data: dict, params: dict, date: datetime.date, index: int
-) -> dict:
-    output = {}
-    hour = ifs_data["time"][:-1][index]
-    date_i = datetime.datetime.combine(date, datetime.time(int(hour))).strftime(
-        "%Y%m%d%H"
-    )
-    if date_i[-2:] == "00":
-        logging.info(f"Radiative transfer for {date_i[:-2]}")
-    input_ifs = prep.prepare_ifs(ifs_data, index, date_i)
-    if len(input_ifs) > 0:
-        try:
-            output = call_rad_trans(input_ifs, params)
-        except ValueError:
-            logging.info(f"Skipping time {date_i}")
-    return output
-
-
-def call_rad_trans(data_in: dict, params: dict, mp: bool = False) -> dict:
-    # Channel bandwidth
-    coeff_bdw = read_bandwidth_coefficients()
-    # Antenna beamwidth
-    ape_ang = read_beamwidth_coefficients()
+def call_rad_trans(data_in: dict, params: dict, site: str) -> dict:
     data_in = prep.check_height(data_in, params["altitude"], 5.0)
     data_nc = rad_trans(
         data_in,
         params,
-        coeff_bdw,
-        ape_ang,
-        mp,
+        site,
     )
     return data_nc
 

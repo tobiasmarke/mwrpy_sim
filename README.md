@@ -3,7 +3,9 @@
 
 Repository for Simulating Microwave Radiometer and Infrared Brightness Temperatures
 
-Note: The code and data files for IR radiative transfer calculations are not included in this repository.
+Note: The radiative transfer is based on [openMWR](https://github.com/DSchlebruegge/openMWR) (GPL-3.0),
+which includes [libRadtran](https://www.libradtran.org/doku.php?id=start) for IR calculations. Both modules need to
+be installed separately.
 
 ## Installation
 
@@ -30,8 +32,6 @@ the following global specifications can be set:
 | global_specs   | Options                     | Description                                  |
 | :------------- | :-------------------------- | :------------------------------------------- |
 | `mw_model`     | `R22`, `R24`                | Model for absorption calculations.           |
-| `corrections`  | `bandwidth`, `beamwidth`    | Corrections for MWR characteristics.         |
-| `refractivity` | `Rueeger2002`, `Thayer1974` | Model for refractivity corrections.          |
 | `clouds`       | `True`, `False`             | Include (True) or skip (False) cloudy cases. |
 | `calc_ir`      | `True`, `False`             | Calculate IR brightness temperatures.        |
 | `era5`         | `pressure`, `model`         | ERA5 data source.                            |

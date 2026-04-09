@@ -1,7 +1,7 @@
-import multiprocessing
-from functools import partial
-
 import numpy as np
+import xarray as xr
+from openMWR.run_RT import _run_IR_date
+from torchMWRT import AtmProfile, RTModel
 
 from mwrpy_sim.data_tools.cloud_mod import (
     detect_cloud_mod,
@@ -9,23 +9,23 @@ from mwrpy_sim.data_tools.cloud_mod import (
     get_cloud_prop,
 )
 from mwrpy_sim.data_tools.stability_indices import calc_stability_indices
-from mwrpy_sim.rad_trans import calc_ir_rt, calc_mw_rt
 from mwrpy_sim.utils import read_config
 
 
 def rad_trans(
     input_dat: dict,
     params: dict,
-    coeff_bdw: dict,
-    ape_ang: np.ndarray,
-    mp: bool,
+    site: str,
 ) -> dict:
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = -999.0
     config = read_config(None, "global_specs")
-    theta = 90.0 - np.array(params["elevation_angle"])
     tb, tb_pro, tb_clr = (
-        np.ones((1, len(params["frequency"]), len(theta)), np.float32) * FillValue
+        np.ones(
+            (1, len(params["frequency"]), len(np.array(params["elevation_angle"]))),
+            np.float32,
+        )
+        * FillValue
         for _ in range(3)
     )
     irt, irt_pro, irt_clr = (
@@ -81,49 +81,37 @@ def rad_trans(
             tb_clr, irt_clr = np.copy(tb_pro), np.copy(irt_pro)
         else:
             # MW radiative transport
-            if len(theta) > 1:
-                pool = multiprocessing.Pool()
-                func = partial(
-                    calc_mw_rt,
-                    input_dat["height"][:],
-                    input_dat["air_temperature"][:],
-                    input_dat["air_pressure"][:] / 100.0,
-                    input_dat["e"],
-                    lwc_tmp,
-                    np.array(params["frequency"]),
-                    coeff_bdw,
-                    False,
-                    ape_ang,
-                )
-                tb_tmp = np.squeeze(np.array([pool.map(func, theta)], np.float32).T)
-                pool.close()
-                pool.join()
-            else:
-                tb_tmp = np.array(
-                    [
-                        calc_mw_rt(
-                            input_dat["height"][:],
-                            input_dat["air_temperature"][:],
-                            input_dat["air_pressure"][:] / 100.0,
-                            input_dat["e"],
-                            lwc_tmp,
-                            np.array(params["frequency"]),
-                            coeff_bdw,
-                            mp,
-                            ape_ang,
-                            ang,
-                        )
-                        for _, ang in enumerate(theta)
-                    ],
-                    np.float32,
-                ).T
-
-            # IR radiative transport (for zenith only)
-            irt_tmp = (
-                calc_ir_rt(input_dat, lwc_tmp, base_tmp, top_tmp, params)
-                if config["calc_ir"]
-                else np.ones((len(params["wavelength"])), np.float32) * FillValue
+            atm_profile = AtmProfile(
+                temperature=input_dat["air_temperature"][:],
+                height=input_dat["height"][:],
+                pressure=input_dat["air_pressure"][:] / 100.0,
+                rh=input_dat["relative_humidity"][:],
+                lwc=lwc_tmp * 1000.0,
             )
+            rtmodel = RTModel(
+                freqs=np.array(params["frequency"]),
+                angles=np.array(params["elevation_angle"]),
+                absmdl=config["mw_model"],
+            )
+            ds = rtmodel.execute(atm_profile, return_ds=True)
+            tb_tmp = ds["tbtotal"].values
+
+            if config["calc_ir"]:
+                ds2 = xr.Dataset(
+                    data_vars=dict(
+                        T=(["height"], input_dat["air_temperature"][:]),
+                        p=(["height"], input_dat["air_pressure"][:] / 100.0),
+                        rh=(["height"], input_dat["relative_humidity"][:] * 100.0),
+                        lwc=(["height"], lwc_tmp * 1000.0),
+                    ),
+                    coords=dict(
+                        height=("height", input_dat["height"][:]),
+                    ),
+                )
+                data_dir = "./mwrpy_sim/rad_trans/openMWR/"
+                irt_tmp = _run_IR_date(ds2, site, data_dir)
+            else:
+                irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
 
             if method == "prognostic":
                 (

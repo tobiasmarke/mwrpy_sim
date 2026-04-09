@@ -25,22 +25,44 @@ from mwrpy_sim.utils import seconds_since_epoch
 def prepare_ifs(ifs_data: dict, index: int, date_i: str) -> dict:
     """Prepare input data from ECMWF's IFS model (Cloudnet format)."""
     hasl = (
-        metpy.calc.add_pressure_to_height(
-            0 * units.meters,
-            np.mean(
-                ifs_data["sfc_pressure_amsl"][:].data - ifs_data["sfc_pressure"][:].data
-            )
-            * units.Pa,
-        ).magnitude
-        * 1000.0
+        np.ma.median(ifs_data["sfc_height_amsl"])
+        if "sfc_height_amsl" in ifs_data.keys()
+        else (
+            metpy.calc.add_pressure_to_height(
+                0 * units.meters,
+                np.mean(
+                    ifs_data["sfc_pressure_amsl"][:].data
+                    - ifs_data["sfc_pressure"][:].data
+                )
+                * units.Pa,
+            ).magnitude
+            * 1000.0
+        )
     )
+    if "sfc_dewpoint_temp_2m" in ifs_data.keys():
+        rh_sfc = metpy.calc.relative_humidity_from_dewpoint(
+            ifs_data["sfc_temp_2m"][index] * units.K,
+            ifs_data["sfc_dewpoint_temp_2m"][index] * units.K,
+        )
+    else:
+        rh_sfc = metpy.calc.relative_humidity_from_specific_humidity(
+            ifs_data["sfc_pressure"][index] * units.Pa,
+            units.Quantity(ifs_data["sfc_temp_2m"][index], "K"),
+            ifs_data["sfc_q_2m"][index],
+        ).magnitude
     input_ifs = {
-        "height": ifs_data["height"][index, :] + hasl,
-        "air_temperature": ifs_data["temperature"][index, :],
-        "air_pressure": ifs_data["pressure"][index, :],
-        "relative_humidity": ifs_data["rh"][index, :],
+        "height": np.hstack(([2.0, ifs_data["height"][index, :]])) + hasl,
+        "air_temperature": np.hstack(
+            ([ifs_data["sfc_temp_2m"][index], ifs_data["temperature"][index, :]])
+        ),
+        "air_pressure": np.hstack(
+            ([ifs_data["sfc_pressure"][index], ifs_data["pressure"][index, :]])
+        ),
+        "relative_humidity": np.hstack(([rh_sfc, ifs_data["rh"][index, :]])),
     }
-    input_ifs["lwc_in"] = ifs_data["ql"][index, :] * moist_rho_rh(
+    input_ifs["lwc_in"] = np.hstack(
+        ([ifs_data["ql"][index, 0], ifs_data["ql"][index, :]])
+    ) * moist_rho_rh(
         input_ifs["air_pressure"],
         input_ifs["air_temperature"],
         input_ifs["relative_humidity"],
@@ -48,7 +70,7 @@ def prepare_ifs(ifs_data: dict, index: int, date_i: str) -> dict:
     input_ifs["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
 
     return (
-        _add_std_atm(input_ifs, h_val=90.0) if len(input_ifs["height"]) == 137 else {}
+        _add_std_atm(input_ifs, h_val=90.0) if len(input_ifs["height"]) == 138 else {}
     )
 
 

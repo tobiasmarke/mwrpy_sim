@@ -1,6 +1,7 @@
 # Site config file
 
 params:
+  gen: G5
   altitude: 104.
   longitude: 14.118
   latitude: 52.208

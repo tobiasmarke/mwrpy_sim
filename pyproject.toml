@@ -22,7 +22,6 @@ dependencies = [
   "pandas",
   "pysonde",
   "scipy",
-  "suncalc",
 ]
 dynamic = ["version"]
 
@@ -48,12 +47,11 @@ module = [
   "metpy.*",
   "netCDF4.*",
   "numpy.*",
+  "openMWR.*",
   "pandas.*",
-  "pylblrtm.*",
   "pysonde.*",
   "scipy.*",
-  "suncalc.*",
-  "yaml.*",
+  "torchMWRT.*",
 ]
 ignore_missing_imports = true
 
