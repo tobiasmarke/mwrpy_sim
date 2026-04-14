@@ -75,4 +75,4 @@ global_specs:
   mw_model: R24
   clouds: True
   calc_ir: False
-  era5: pressure
+  era5: cloudnet

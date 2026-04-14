@@ -22,56 +22,59 @@ from mwrpy_sim.atmos import (
 from mwrpy_sim.utils import seconds_since_epoch
 
 
-def prepare_ifs(ifs_data: dict, index: int, date_i: str) -> dict:
-    """Prepare input data from ECMWF's IFS model (Cloudnet format)."""
-    hasl = (
-        np.ma.median(ifs_data["sfc_height_amsl"])
-        if "sfc_height_amsl" in ifs_data.keys()
-        else (
-            metpy.calc.add_pressure_to_height(
-                0 * units.meters,
-                np.mean(
-                    ifs_data["sfc_pressure_amsl"][:].data
-                    - ifs_data["sfc_pressure"][:].data
-                )
-                * units.Pa,
-            ).magnitude
-            * 1000.0
-        )
+def prepare_cn(cn_data: dict, index: int, date_i: str, add_2m: bool = True) -> dict:
+    """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
+    hasl = metpy.calc.geopotential_to_height(
+        units.Quantity(cn_data["sfc_geopotential"][index], "m^2/s^2")
+    ).magnitude
+    input_cn = {
+        "height": cn_data["height"][index, :] + hasl,
+        "air_temperature": cn_data["temperature"][index, :],
+        "air_pressure": cn_data["pressure"][index, :],
+        "relative_humidity": cn_data["rh"][index, :],
+    }
+    input_cn["lwc_in"] = cn_data["ql"][index, :] * moist_rho_rh(
+        input_cn["air_pressure"],
+        input_cn["air_temperature"],
+        input_cn["relative_humidity"],
     )
-    if "sfc_dewpoint_temp_2m" in ifs_data.keys():
+    if add_2m:
+        input_cn = _add_2m_fields(cn_data, input_cn, index, hasl)
+    input_cn["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
+    check_len = 138 if add_2m else 137
+    return (
+        _add_std_atm(input_cn, h_val=90.0)
+        if len(input_cn["height"]) == check_len
+        else {}
+    )
+
+
+def _add_2m_fields(cn_data: dict, input_cn: dict, index: int, hasl: float) -> dict:
+    """Add 2m fields to input."""
+    if "sfc_dewpoint_temp_2m" in cn_data.keys():
         rh_sfc = metpy.calc.relative_humidity_from_dewpoint(
-            ifs_data["sfc_temp_2m"][index] * units.K,
-            ifs_data["sfc_dewpoint_temp_2m"][index] * units.K,
-        )
+            cn_data["sfc_temp_2m"][index] * units.K,
+            cn_data["sfc_dewpoint_temp_2m"][index] * units.K,
+        ).magnitude
     else:
         rh_sfc = metpy.calc.relative_humidity_from_specific_humidity(
-            ifs_data["sfc_pressure"][index] * units.Pa,
-            units.Quantity(ifs_data["sfc_temp_2m"][index], "K"),
-            ifs_data["sfc_q_2m"][index],
+            cn_data["sfc_pressure"][index] * units.Pa,
+            units.Quantity(cn_data["sfc_temp_2m"][index], "K"),
+            cn_data["sfc_q_2m"][index],
         ).magnitude
-    input_ifs = {
-        "height": np.hstack(([2.0, ifs_data["height"][index, :]])) + hasl,
+
+    input_cn = {
+        "height": np.hstack(([2.0 + hasl, input_cn["height"]])),
         "air_temperature": np.hstack(
-            ([ifs_data["sfc_temp_2m"][index], ifs_data["temperature"][index, :]])
+            ([cn_data["sfc_temp_2m"][index], input_cn["air_temperature"]])
         ),
         "air_pressure": np.hstack(
-            ([ifs_data["sfc_pressure"][index], ifs_data["pressure"][index, :]])
+            ([cn_data["sfc_pressure"][index], input_cn["air_pressure"]])
         ),
-        "relative_humidity": np.hstack(([rh_sfc, ifs_data["rh"][index, :]])),
+        "relative_humidity": np.hstack(([rh_sfc, input_cn["relative_humidity"]])),
+        "lwc_in": np.hstack((input_cn["lwc_in"][0], input_cn["lwc_in"])),
     }
-    input_ifs["lwc_in"] = np.hstack(
-        ([ifs_data["ql"][index, 0], ifs_data["ql"][index, :]])
-    ) * moist_rho_rh(
-        input_ifs["air_pressure"],
-        input_ifs["air_temperature"],
-        input_ifs["relative_humidity"],
-    )
-    input_ifs["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
-
-    return (
-        _add_std_atm(input_ifs, h_val=90.0) if len(input_ifs["height"]) == 138 else {}
-    )
+    return input_cn
 
 
 def prepare_era5_mod(
@@ -237,6 +240,7 @@ def prepare_standard_atmosphere(prof: int = 5) -> dict:
         "height": sa_data.variables["height"][:].astype(np.float64) * 1000.0,
         "air_temperature": sa_data.variables["t_atmo"][:, prof].astype(np.float64),
         "air_pressure": sa_data.variables["p_atmo"][:, prof].astype(np.float64) * 100.0,
+        "lwc_in": np.zeros(len(sa_data.variables["height"][:]), dtype=np.float64),
     }
     input_sa["relative_humidity"] = q2rh(
         sa_data.variables["q_atmo"][:, prof].astype(np.float64) * 1000.0,

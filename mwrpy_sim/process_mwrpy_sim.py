@@ -77,33 +77,32 @@ def process_input(
 ) -> dict:
     data_nc: dict = {}
     config = read_config(None, "global_specs")
-    if source == "ifs":
+    if (source == "ifs") or (source == "era5" and config["era5"][:] == "cloudnet"):
         for date in date_range(start_date, stop_date):
-            data_in = (
-                params["data_ifs"] + date.strftime("%Y/") + date.strftime("%Y%m%d")
-            )
-            file_name = get_file_list(data_in, "ecmwf")
+            data_in = params["data_cn"] + date.strftime("%Y/") + date.strftime("%Y%m%d")
+            key = "ecmwf" if source == "ifs" else "era5"
+            file_name = get_file_list(data_in, key)
             if len(file_name) == 1:
-                with nc.Dataset(file_name[0]) as ifs_data:
-                    if len(ifs_data["time"]) == 25 and np.all(
-                        ~ifs_data["temperature"][:-1, 0].mask
+                with nc.Dataset(file_name[0]) as cn_data:
+                    if len(cn_data["time"]) == 25 and np.all(
+                        ~cn_data["temperature"][:-1, 0].mask
                     ):
-                        ifs_dict = {
-                            var: np.squeeze(ifs_data.variables[var][:])
-                            for var in ifs_data.variables
+                        cn_dict = {
+                            var: np.squeeze(cn_data.variables[var][:])
+                            for var in cn_data.variables
                         }
-                        for index, hour in enumerate(ifs_dict["time"][:-1]):
+                        for index, hour in enumerate(cn_dict["time"][:-1]):
                             date_i = datetime.datetime.combine(
                                 date, datetime.time(int(hour))
                             ).strftime("%Y%m%d%H")
                             if date_i[-2:] == "00":
                                 logging.info(f"Radiative transfer for {date_i[:-2]}")
-                            input_ifs = prep.prepare_ifs(ifs_dict, index, date_i)
-                            if len(input_ifs) > 0 and np.all(
-                                ~input_ifs["air_temperature"].mask
+                            input_cn = prep.prepare_cn(cn_dict, index, date_i, False)
+                            if len(input_cn) > 0 and np.all(
+                                ~input_cn["air_temperature"].mask
                             ):
                                 try:
-                                    output_hour = call_rad_trans(input_ifs, params)
+                                    output_hour = call_rad_trans(input_cn, params)
                                 except ValueError:
                                     logging.info(f"Skipping time {date_i}")
                                 data_nc = append_data(data_nc, output_hour)

@@ -167,7 +167,7 @@ def era5_geopot(level, ps, gpot, temp, hum) -> tuple[np.ndarray, np.ndarray]:
     """
     file_mh = (
         os.path.dirname(os.path.realpath(__file__))
-        + "/rad_trans/coeff/era5_model_levels_137.csv"
+        + "/data_tools/era5_download/era5_model_levels_137.csv"
     )
     mod_lvl = pd.read_csv(file_mh)
     a_cf = mod_lvl["a [Pa]"].values[:].astype("float")
