@@ -114,7 +114,7 @@ def rad_trans_day(
                     height=("height", input_dat["height"][:]),
                 ),
             )
-            irt_tmp = run_pool(ds, 24, run_rad_trans_ir, params)
+            irt_tmp = run_pool(ds, 24, run_rad_trans_ir, params).to_numpy()
         else:
             irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
 

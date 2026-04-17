@@ -99,7 +99,7 @@ def process_input(
                             for hour in cn_dict["time"][:-1]
                         ]
                         input_cn = prep.prepare_cn(
-                            cn_dict, np.arange(24), date_arr, True
+                            cn_dict, np.arange(24), date_arr, False
                         )
                         input_cn = prep.check_height_day(input_cn, params["altitude"])
                         data_nc = rad_trans_day(input_cn, params)

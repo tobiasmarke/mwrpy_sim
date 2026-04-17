@@ -99,7 +99,7 @@ def rad_trans(
                         height=("height", input_dat["height"][:]),
                     ),
                 )
-                irt_tmp = run_rad_trans_ir(ds, params)
+                irt_tmp = run_rad_trans_ir(ds, params).to_numpy()
             else:
                 irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
 

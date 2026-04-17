@@ -12,7 +12,7 @@ from openMWR.run_RT import _effective_droplet_radius_mum
 from mwrpy_sim.utils import loadCoeffsJSON
 
 
-def run_rad_trans_ir(ds_date: xr.Dataset, params: dict) -> np.ndarray:
+def run_rad_trans_ir(ds_date: xr.Dataset, params: dict) -> xr.DataArray:
     """Module for IR radiative transfer calculations."""
     z_m = ds_date.height.values
     z_km = z_m / 1000
@@ -26,7 +26,7 @@ def run_rad_trans_ir(ds_date: xr.Dataset, params: dict) -> np.ndarray:
     TB_IR = calculate_IR_band_TB(
         z_km, T_K, rh_100, p_hPa, lwc_gpm3, effective_droplet_radius_mum, params
     )
-    return TB_IR
+    return xr.DataArray(TB_IR)
 
 
 def calculate_IR_band_TB(
