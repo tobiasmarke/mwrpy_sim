@@ -1,4 +1,5 @@
 import numpy as np
+import xarray as xr
 from torchMWRT import AtmProfile, RTModel
 
 from mwrpy_sim.data_tools.cloud_mod import (
@@ -16,23 +17,28 @@ def rad_trans(
     params: dict,
 ) -> dict:
     """Run radiative transfer calculations for one atmospheric profile."""
-    FillValue = -999.0
+    FillValue = np.nan
     config = read_config(None, "global_specs")
     tb, tb_pro, tb_clr = (
         np.ones(
-            (1, len(params["frequency"]), len(np.array(params["elevation_angle"]))),
+            (len(params["frequency"]), len(np.array(params["elevation_angle"]))),
             np.float32,
         )
         * FillValue
         for _ in range(3)
     )
     irt, irt_pro, irt_clr = (
-        np.ones((1, len(params["wavelength"])), np.float32) * FillValue
-        for _ in range(3)
+        np.ones(len(params["wavelength"]), np.float32) * FillValue for _ in range(3)
     )
     lwp, lwp_pro = (FillValue for _ in range(2))
     base, base_pro, top, top_pro = (
         np.ones(15, np.float32) * FillValue for _ in range(4)
+    )
+    lwc_tmp, lwp_tmp, base_tmp, top_tmp = (
+        np.zeros(len(input_dat["height"][:]), np.float32),
+        0.0,
+        np.ones(15, np.int32) * FillValue,
+        np.ones(15, np.int32) * FillValue,
     )
 
     # Cloud geometry [m] / cloud water content (LWC, LWP)
@@ -42,14 +48,7 @@ def rad_trans(
         else ("detected", "clear")
     )
     for method in cloud_methods:
-        if method == "clear":
-            lwc_tmp, lwp_tmp, base_tmp, top_tmp = (
-                np.zeros(len(input_dat["height"][:]), np.float32),
-                0.0,
-                np.zeros(15, np.int32),
-                np.zeros(15, np.int32),
-            )
-        else:
+        if method in ("prognostic", "detected"):
             top_tmp, base_tmp = (
                 detect_cloud_mod(input_dat["height"][:], input_dat["lwc_in"][:])
                 if method == "prognostic"
@@ -61,16 +60,10 @@ def rad_trans(
                     )
                 )
             )
-            lwc_tmp, lwp_tmp = (
-                get_cloud_prop(base_tmp, top_tmp, input_dat, method)
-                if len(top_tmp) in np.linspace(1, 15, 15)
-                else (np.zeros(len(input_dat["height"][:]), np.float32), 0.0)
-            )
-            top_tmp, base_tmp = (
-                (np.zeros(15, np.int32), np.zeros(15, np.int32))
-                if len(top_tmp) not in np.linspace(1, 15, 15)
-                else (top_tmp, base_tmp)
-            )
+            if len(top_tmp) in np.arange(15) + 1:
+                lwc_tmp, lwp_tmp = get_cloud_prop(base_tmp, top_tmp, input_dat, method)
+            elif len(top_tmp) > 15:
+                continue
 
         # Avoid extra "clear" RT calculation for cases without liquid water
         if method == "clear" and lwp == 0.0:
@@ -95,7 +88,18 @@ def rad_trans(
             tb_tmp = ds["tbtotal"].values
 
             if config["calc_ir"]:
-                irt_tmp = run_rad_trans_ir(input_dat, lwc_tmp, params)
+                ds = xr.Dataset(
+                    data_vars=dict(
+                        T=(["height"], input_dat["air_temperature"]),
+                        p=(["height"], input_dat["air_pressure"] / 100.0),
+                        rh=(["height"], input_dat["relative_humidity"] * 100.0),
+                        lwc=(["height"], lwc_tmp * 1000.0),
+                    ),
+                    coords=dict(
+                        height=("height", input_dat["height"][:]),
+                    ),
+                )
+                irt_tmp = run_rad_trans_ir(ds, params)
             else:
                 irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
 
@@ -136,20 +140,20 @@ def rad_trans(
 
     # Make output dictionary and interpolate to final grid
     output = {
-        "time": np.asarray([input_dat["time"]]),
-        "tb": np.expand_dims(tb, 0),
-        "tb_pro": np.expand_dims(tb_pro, 0),
-        "tb_clr": np.expand_dims(tb_clr, 0),
-        "irt": np.expand_dims(irt, 0),
-        "irt_pro": np.expand_dims(irt_pro, 0),
-        "irt_clr": np.expand_dims(irt_clr, 0),
-        "lwp": np.asarray([lwp]),
-        "lwp_pro": np.asarray([lwp_pro]),
-        "iwv": input_dat["iwv"],
-        "cbh": np.expand_dims(base, 0),
-        "cbh_pro": np.expand_dims(base_pro, 0),
-        "cth": np.expand_dims(top, 0),
-        "cth_pro": np.expand_dims(top_pro, 0),
+        "time": np.ma.masked_invalid(np.asarray([input_dat["time"]])),
+        "tb": np.ma.masked_invalid(np.expand_dims(tb, 0)),
+        "tb_pro": np.ma.masked_invalid(np.expand_dims(tb_pro, 0)),
+        "tb_clr": np.ma.masked_invalid(np.expand_dims(tb_clr, 0)),
+        "irt": np.ma.masked_invalid(np.expand_dims(irt, 0)),
+        "irt_pro": np.ma.masked_invalid(np.expand_dims(irt_pro, 0)),
+        "irt_clr": np.ma.masked_invalid(np.expand_dims(irt_clr, 0)),
+        "lwp": np.ma.masked_invalid(np.asarray([lwp])),
+        "lwp_pro": np.ma.masked_invalid(np.asarray([lwp_pro])),
+        "iwv": np.ma.masked_invalid(input_dat["iwv"]),
+        "cbh": np.ma.masked_invalid(np.expand_dims(base, 0)),
+        "cbh_pro": np.ma.masked_invalid(np.expand_dims(base_pro, 0)),
+        "cth": np.ma.masked_invalid(np.expand_dims(top, 0)),
+        "cth_pro": np.ma.masked_invalid(np.expand_dims(top_pro, 0)),
     }
     var_names = [
         "air_pressure",
@@ -161,24 +165,20 @@ def rad_trans(
     ]
     for var in var_names:
         if var in input_dat:
-            output[var] = np.expand_dims(
-                np.interp(
-                    params["height"],
-                    input_dat["height"][:] - input_dat["height"][0],
-                    input_dat[var][:],
-                ),
-                0,
+            output[var] = np.ma.masked_invalid(
+                np.expand_dims(
+                    np.interp(
+                        params["height"],
+                        input_dat["height"][:] - input_dat["height"][0],
+                        input_dat[var][:],
+                    ),
+                    0,
+                )
             )
         else:
-            output[var] = np.full((1, len(params["height"])), FillValue, np.float32)
+            output[var] = np.ma.masked_all((1, len(params["height"])), np.float32)
 
     # Calculate stability indices
-    calc_stability_indices(output, params["height"][:])
+    stab_dict = calc_stability_indices(output, params["height"][:])
 
-    # Convert all fields in output to masked arrays
-    for key in output:
-        if isinstance(output[key], np.ndarray):
-            output[key] = np.ma.masked_invalid(output[key])
-            output[key] = np.ma.masked_equal(output[key], FillValue)
-
-    return output
+    return dict(output, **stab_dict)

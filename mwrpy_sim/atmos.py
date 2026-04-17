@@ -24,19 +24,6 @@ def abs_hum(T: np.ndarray, rh: np.ndarray) -> np.ndarray:
     return (rh * es) / (con.RW * T)
 
 
-def calc_rho(T: np.ndarray, rh: np.ndarray):
-    """Density of moist air (g/m^3) from temperature and relative humidity.
-    Input:
-        T: Temperature (K).
-        rh: Relative humidity (0-1).
-    Output:
-        Density of moist air (g/m^3).
-    """
-    es = calc_saturation_vapor_pressure(T) / 100.0
-
-    return es * rh
-
-
 def calc_p_baro(
     T: np.ndarray, a: np.ndarray, p: np.ndarray, z: np.ndarray
 ) -> np.ndarray:
@@ -44,11 +31,11 @@ def calc_p_baro(
     e = vap_pres(a, T)
     q = con.MW_RATIO * e / (np.broadcast_to(p, e.T.shape).T - 0.378 * e)
     Tv = T * (1 + 0.608 * q)
-    Tv_half = (Tv[:-1] + Tv[1:]) / 2
+    Tv_half = (Tv[:-1] + Tv[1:]) / 2 if Tv.ndim == 1 else (Tv[:, :-1] + Tv[:, 1:]) / 2
     dz = np.diff(z)
     dp = np.ma.exp(-con.g0 * dz / (con.RS * Tv_half))
-    tmp = np.insert(dp, 0, p, axis=0)
-    p_baro = np.cumprod(tmp, axis=0)
+    tmp = np.insert(dp, 0, p, axis=0) if dp.ndim == 1 else np.insert(dp, 0, p, axis=1)
+    p_baro = np.cumprod(tmp, axis=0) if dp.ndim == 1 else np.cumprod(tmp, axis=1)
     return p_baro
 
 
@@ -146,7 +133,11 @@ def hum_to_iwv(ahum, height):
     Output:
         iwv in kg/m^2
     """
-    iwv = np.sum((ahum[1:] + ahum[:-1]) / 2.0 * np.diff(height))
+    iwv = (
+        np.sum((ahum[1:] + ahum[:-1]) / 2.0 * np.diff(height))
+        if ahum.ndim == 1
+        else np.sum((ahum[:, 1:] + ahum[:, :-1]) / 2.0 * np.diff(height), axis=1)
+    )
 
     return iwv
 
@@ -177,7 +168,8 @@ def era5_geopot(level, ps, gpot, temp, hum) -> tuple[np.ndarray, np.ndarray]:
     p_h = a_cf + b_cf * ps
     pres = (p_h + np.roll(p_h, 1, axis=0))[1:] / 2
 
-    for lev in sorted(level.astype(int), reverse=True):
+    level_i = np.array(sorted(level.astype(int), reverse=True))
+    for lev in level_i:
         i_z = np.where(level == lev)[0]
         p_l = a_cf[lev - 1] + (b_cf[lev - 1] * ps)
         p_lp = a_cf[lev] + (b_cf[lev] * ps)

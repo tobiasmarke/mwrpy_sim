@@ -13,6 +13,7 @@ from mwrpy_sim.data_tools.era5_download.get_era5 import era5_request
 from mwrpy_sim.plot.plotting import plot_sim_data
 from mwrpy_sim.rad_trans.rad_trans_meta import get_data_attributes
 from mwrpy_sim.rad_trans.run_rad_trans import rad_trans
+from mwrpy_sim.rad_trans.run_rad_trans_day import rad_trans_day
 from mwrpy_sim.utils import (
     _get_filename,
     append_data,
@@ -91,21 +92,17 @@ def process_input(
                             var: np.squeeze(cn_data.variables[var][:])
                             for var in cn_data.variables
                         }
-                        for index, hour in enumerate(cn_dict["time"][:-1]):
-                            date_i = datetime.datetime.combine(
+                        date_arr = [
+                            datetime.datetime.combine(
                                 date, datetime.time(int(hour))
                             ).strftime("%Y%m%d%H")
-                            if date_i[-2:] == "00":
-                                logging.info(f"Radiative transfer for {date_i[:-2]}")
-                            input_cn = prep.prepare_cn(cn_dict, index, date_i, False)
-                            if len(input_cn) > 0 and np.all(
-                                ~input_cn["air_temperature"].mask
-                            ):
-                                try:
-                                    output_hour = call_rad_trans(input_cn, params)
-                                except ValueError:
-                                    logging.info(f"Skipping time {date_i}")
-                                data_nc = append_data(data_nc, output_hour)
+                            for hour in cn_dict["time"][:-1]
+                        ]
+                        input_cn = prep.prepare_cn(
+                            cn_dict, np.arange(24), date_arr, True
+                        )
+                        input_cn = prep.check_height_day(input_cn, params["altitude"])
+                        data_nc = rad_trans_day(input_cn, params)
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)

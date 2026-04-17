@@ -12,23 +12,24 @@ from scipy.interpolate import CubicSpline
 import mwrpy_sim.constants as con
 from mwrpy_sim.atmos import (
     abs_hum,
-    calc_rho,
     era5_geopot,
     hum_to_iwv,
-    mixr,
     moist_rho_rh,
     q2rh,
 )
 from mwrpy_sim.utils import seconds_since_epoch
 
 
-def prepare_cn(cn_data: dict, index: int, date_i: str, add_2m: bool = True) -> dict:
+def prepare_cn(
+    cn_data: dict, index: int | np.ndarray, date_i: str | list, add_2m: bool = True
+) -> dict:
     """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
     hasl = metpy.calc.geopotential_to_height(
         units.Quantity(cn_data["sfc_geopotential"][index], "m^2/s^2")
     ).magnitude
     input_cn = {
-        "height": cn_data["height"][index, :] + hasl,
+        "height": cn_data["height"][index, :]
+        + np.resize(hasl, cn_data["height"][index, :].shape),
         "air_temperature": cn_data["temperature"][index, :],
         "air_pressure": cn_data["pressure"][index, :],
         "relative_humidity": cn_data["rh"][index, :],
@@ -40,39 +41,82 @@ def prepare_cn(cn_data: dict, index: int, date_i: str, add_2m: bool = True) -> d
     )
     if add_2m:
         input_cn = _add_2m_fields(cn_data, input_cn, index, hasl)
-    input_cn["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
-    check_len = 138 if add_2m else 137
-    return (
-        _add_std_atm(input_cn, h_val=90.0)
-        if len(input_cn["height"]) == check_len
-        else {}
+    input_cn["time"] = (
+        np.array(seconds_since_epoch(date_i), dtype=np.int64)
+        if isinstance(date_i, str)
+        else np.array([seconds_since_epoch(d_str) for d_str in date_i], dtype=np.int64)
     )
+    check_len = 138 if add_2m else 137
+    n_h = (
+        len(input_cn["height"])
+        if input_cn["height"].ndim == 1
+        else input_cn["height"].shape[1]
+    )
+    return _add_std_atm(input_cn, h_val=90.0) if n_h == check_len else {}
 
 
-def _add_2m_fields(cn_data: dict, input_cn: dict, index: int, hasl: float) -> dict:
+def _add_2m_fields(
+    cn_data: dict, input_cn: dict, index: int | np.ndarray, hasl: float
+) -> dict:
     """Add 2m fields to input."""
     if "sfc_dewpoint_temp_2m" in cn_data.keys():
-        rh_sfc = metpy.calc.relative_humidity_from_dewpoint(
-            cn_data["sfc_temp_2m"][index] * units.K,
-            cn_data["sfc_dewpoint_temp_2m"][index] * units.K,
-        ).magnitude
+        rh_sfc = np.array(
+            [
+                float(
+                    metpy.calc.relative_humidity_from_dewpoint(
+                        units.Quantity(cn_data["sfc_temp_2m"][ind], "K"),
+                        units.Quantity(cn_data["sfc_dewpoint_temp_2m"][ind], "K"),
+                    ).magnitude
+                )
+                for ind in np.arange(len(cn_data["sfc_dewpoint_temp_2m"]))
+            ]
+        )
     else:
-        rh_sfc = metpy.calc.relative_humidity_from_specific_humidity(
-            cn_data["sfc_pressure"][index] * units.Pa,
-            units.Quantity(cn_data["sfc_temp_2m"][index], "K"),
-            cn_data["sfc_q_2m"][index],
-        ).magnitude
+        rh_sfc = np.array(
+            [
+                float(
+                    metpy.calc.relative_humidity_from_specific_humidity(
+                        units.Quantity(cn_data["sfc_pressure"][ind], "Pa"),
+                        units.Quantity(cn_data["sfc_temp_2m"][ind], "K"),
+                        cn_data["sfc_q_2m"][ind],
+                    ).magnitude
+                )
+                for ind in np.arange(len(cn_data["sfc_q_2m"]))
+            ]
+        )
 
+    ax = 0 if input_cn["height"].ndim == 1 else 1
+    lwc_0 = (
+        input_cn["lwc_in"][0]
+        if input_cn["height"].ndim == 1
+        else input_cn["lwc_in"][:, 0]
+    )
     input_cn = {
-        "height": np.hstack(([2.0 + hasl, input_cn["height"]])),
-        "air_temperature": np.hstack(
-            ([cn_data["sfc_temp_2m"][index], input_cn["air_temperature"]])
+        "height": np.insert(input_cn["height"], 0, 2.0 + hasl, axis=ax),
+        "air_temperature": np.insert(
+            input_cn["air_temperature"],
+            0,
+            cn_data["sfc_temp_2m"][index],
+            axis=ax,
         ),
-        "air_pressure": np.hstack(
-            ([cn_data["sfc_pressure"][index], input_cn["air_pressure"]])
+        "air_pressure": np.insert(
+            input_cn["air_pressure"],
+            0,
+            cn_data["sfc_pressure"][index],
+            axis=ax,
         ),
-        "relative_humidity": np.hstack(([rh_sfc, input_cn["relative_humidity"]])),
-        "lwc_in": np.hstack((input_cn["lwc_in"][0], input_cn["lwc_in"])),
+        "relative_humidity": np.insert(
+            input_cn["relative_humidity"],
+            0,
+            rh_sfc[index],
+            axis=ax,
+        ),
+        "lwc_in": np.insert(
+            input_cn["lwc_in"],
+            0,
+            lwc_0,
+            axis=ax,
+        ),
     }
     return input_cn
 
@@ -274,14 +318,44 @@ def _add_std_atm(input_dat: dict, h_val: float = 100.0, prof: int = 5) -> dict:
     """
     sa = prepare_standard_atmosphere(prof)
     ind_sa = np.where(sa["height"][:] >= h_val * 1000.0)[0]
-    var_names = ["height", "air_temperature", "air_pressure", "relative_humidity"]
-    if len(ind_sa) > 0 and input_dat["height"][-1] < h_val * 1000.0:
+    var_names = [
+        "height",
+        "air_temperature",
+        "air_pressure",
+        "relative_humidity",
+        "lwc_in",
+    ]
+    h_top = (
+        float(input_dat["height"][-1])
+        if input_dat["height"].ndim == 1
+        else np.max(input_dat["height"][:, -1])
+    )
+    if len(ind_sa) > 0 and h_top < h_val * 1000.0:
         for var in var_names:
-            input_dat[var] = np.append(input_dat[var], sa[var][ind_sa])
-        if "lwc_in" in input_dat:
-            input_dat["lwc_in"] = np.append(
-                input_dat["lwc_in"], np.zeros(len(ind_sa), dtype=np.float64)
-            )
+            if var == "lwc_in" and var in input_dat:
+                if input_dat[var].ndim == 1:
+                    input_dat["lwc_in"] = np.append(
+                        input_dat["lwc_in"], np.zeros(len(ind_sa), dtype=np.float64)
+                    )
+                else:
+                    input_dat["lwc_in"] = np.hstack(
+                        (
+                            input_dat["lwc_in"],
+                            np.zeros(
+                                (len(input_dat["lwc_in"]), len(sa[var][ind_sa])),
+                                dtype=np.float64,
+                            ),
+                        )
+                    )
+            else:
+                sa_add = (
+                    sa[var][ind_sa]
+                    if input_dat[var].ndim == 1
+                    else np.resize(
+                        sa[var][ind_sa], (len(input_dat[var]), len(sa[var][ind_sa]))
+                    )
+                )
+                input_dat[var] = np.hstack((input_dat[var], sa_add))
 
     return _add_vars(input_dat)
 
@@ -291,29 +365,21 @@ def _add_vars(input_dat) -> dict:
     input_dat["absolute_humidity"] = abs_hum(
         input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
     )
-    input_dat["e"] = calc_rho(
-        input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
-    )
-    if "mixr" not in input_dat:
-        input_dat["mixr"] = mixr(
-            input_dat["air_temperature"][:],
-            input_dat["absolute_humidity"][:],
-            input_dat["air_pressure"][0],
-            input_dat["height"][:],
-        )
     for key in input_dat.keys():
         input_dat[key] = np.ma.asarray(input_dat[key])
     if "iwv" not in input_dat:
-        input_dat["iwv"] = np.ma.array(
-            [
-                hum_to_iwv(
-                    input_dat["absolute_humidity"][:],
-                    input_dat["height"][:],
-                )
-                if not np.any(input_dat["absolute_humidity"].mask)
-                else -999.0
-            ],
-            dtype=np.float64,
+        input_dat["iwv"] = (
+            np.ma.array(
+                [
+                    hum_to_iwv(
+                        input_dat["absolute_humidity"],
+                        input_dat["height"],
+                    )
+                ],
+                dtype=np.float64,
+            )
+            if not np.any(input_dat["absolute_humidity"].mask)
+            else np.ma.array(np.ones(len(input_dat["time"])) * np.nan)
         )
 
     return input_dat
@@ -381,6 +447,83 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 5.0) -> d
             else -999.0
         ],
         dtype=np.float64,
+    )
+
+    return input_dict
+
+
+def check_height_day(input_dict: dict, altitude: float, tolerance: float = 5.0) -> dict:
+    """Compare input data height with altitude and cut/extrapolate if necessary.
+    In addition, calculate integrated water vapor (iwv) from absolute humidity.
+
+    Parameters
+    input_dict : dict
+        Input data dictionary containing height and other atmospheric variables.
+    altitude : float
+        Altitude to compare with the input data height.
+    tolerance : float, optional
+        Tolerance for the height comparison, by default 5 m.
+
+    Returns:
+    dict
+        Updated input data dictionary with height adjusted to the specified altitude.
+    """
+    delta_z = input_dict["height"][:, 0] - altitude
+    height_new = np.mean(input_dict["height"], axis=0)
+    if np.all(np.abs(delta_z) > tolerance) and np.all(delta_z < -150.0):
+        # Cut off the first part of the profile
+        for key in input_dict:
+            if input_dict[key].ndim == 2:
+                input_dict[key] = input_dict[key][
+                    :, np.all(input_dict["height"] >= altitude, axis=0)
+                ]
+        height_new = np.mean(input_dict["height"], axis=0)
+
+    elif np.all(np.abs(delta_z) > tolerance) and np.all(delta_z >= -150.0):
+        # Extrapolate the first part of the profile (< 1000 m)
+        ind_h = np.all(input_dict["height"] < 1000.0, axis=0)
+        height_1000 = (
+            height_new[ind_h]
+            - np.mean(delta_z)
+            + np.linspace(0, 1, len(height_new[ind_h])) * np.mean(delta_z)
+        )
+        height_new = np.concatenate([height_1000, height_new[~ind_h]])
+        for itx, _ in enumerate(input_dict["time"]):
+            for key in input_dict:
+                if (
+                    input_dict[key].ndim == 2
+                    and input_dict[key].shape[1] == len(height_new)
+                    and key != "height"
+                ):
+                    f = CubicSpline(
+                        input_dict["height"][itx, ind_h],
+                        input_dict[key][itx, ind_h],
+                        bc_type="natural",
+                    )
+                    input_dict[key][itx, :] = np.ma.concatenate(
+                        [f(height_new[ind_h]), input_dict[key][itx, ~ind_h].data]
+                    )
+                    input_dict[key][itx, :] = np.interp(
+                        input_dict["height"][itx, :],
+                        height_new,
+                        input_dict[key][itx, :],
+                    )
+
+    input_dict["height"] = height_new
+    input_dict["lwc_in"][input_dict["lwc_in"] < 1e-8] = 0.0
+
+    input_dict["iwv"] = (
+        np.ma.array(
+            [
+                hum_to_iwv(
+                    input_dict["absolute_humidity"],
+                    input_dict["height"],
+                )
+            ],
+            dtype=np.float64,
+        )
+        if not np.any(input_dict["absolute_humidity"].mask)
+        else np.ma.array(np.ones(len(input_dict["time"])) * np.nan)
     )
 
     return input_dict

@@ -12,19 +12,8 @@ from openMWR.run_RT import _effective_droplet_radius_mum
 from mwrpy_sim.utils import loadCoeffsJSON
 
 
-def run_rad_trans_ir(input_dat: dict, lwc_tmp: np.ndarray, params: dict) -> np.ndarray:
-    ds_date = xr.Dataset(
-        data_vars=dict(
-            T=(["height"], input_dat["air_temperature"][:]),
-            p=(["height"], input_dat["air_pressure"][:] / 100.0),
-            rh=(["height"], input_dat["relative_humidity"][:] * 100.0),
-            lwc=(["height"], lwc_tmp * 1000.0),
-        ),
-        coords=dict(
-            height=("height", input_dat["height"][:]),
-        ),
-    )
-
+def run_rad_trans_ir(ds_date: xr.Dataset, params: dict) -> np.ndarray:
+    """Module for IR radiative transfer calculations."""
     z_m = ds_date.height.values
     z_km = z_m / 1000
     T_K = ds_date.T.values
@@ -34,6 +23,16 @@ def run_rad_trans_ir(input_dat: dict, lwc_tmp: np.ndarray, params: dict) -> np.n
 
     effective_droplet_radius_mum = _effective_droplet_radius_mum(lwc_gpm3)
 
+    TB_IR = calculate_IR_band_TB(
+        z_km, T_K, rh_100, p_hPa, lwc_gpm3, effective_droplet_radius_mum, params
+    )
+    return TB_IR
+
+
+def calculate_IR_band_TB(
+    z_km, T_K, rh_100, p_hPa, lwc_gpm3, effective_droplet_radius_mum, params
+) -> np.ndarray:
+    """Calculate IRT with spectral response function."""
     zeitstempel_ns = time.time_ns()
     data_dir = "./mwrpy_sim/rad_trans/openMWR/"
     libRadtran_data_dir = Path(libRadtran_dir(data_dir)).resolve()
@@ -122,7 +121,7 @@ def _irspectrum2irt(
 ) -> float:
     """Convert IR spectrum to broadband IRT."""
     # Load spectral response function
-    path = os.path.dirname(os.path.realpath(__file__)) + "/coeff/irt_srf.json"
+    path = os.path.dirname(os.path.realpath(__file__)) + "/irt_srf.json"
     srf = loadCoeffsJSON(path)
 
     # Calculate IRT
@@ -142,7 +141,7 @@ def _irspectrum2irt(
     weight = np.interp(wavenumber, srf_wnum, srf_resp, left=0.0, right=0.0)
     mwnum = np.divide(np.sum(wavenumber * weight), np.sum(weight))
     mrad = np.divide(np.sum(ir_spectrum * weight), np.sum(weight))
-    print(mwnum)
+
     return _invplanck(mwnum, mrad)
 
 

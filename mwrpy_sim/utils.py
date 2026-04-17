@@ -9,6 +9,7 @@ from typing import Any, Iterator, Literal, NamedTuple
 import numpy as np
 import yaml
 from numpy import ma
+from scipy.interpolate import RegularGridInterpolator
 from yaml.loader import SafeLoader
 
 Epoch = tuple[int, int, int]
@@ -103,7 +104,9 @@ def seconds2date(time_in_seconds: int, epoch: Epoch = (2001, 1, 1)) -> str:
         datetime.datetime(*epoch, tzinfo=timezone.utc)
     )
     timestamp = time_in_seconds + epoch_in_seconds
-    return datetime.datetime.utcfromtimestamp(timestamp).strftime("%Y%m%d%H")
+    return datetime.datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
+        "%Y%m%d%H"
+    )
 
 
 def seconds_since_epoch(date: str, epoch: Epoch = (1970, 1, 1)) -> int:
@@ -193,7 +196,7 @@ def date_string_to_date(date_string: str) -> datetime.date:
 
 def get_time() -> str:
     """Returns current UTC-time."""
-    return f"{datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} +00:00"
+    return f"{datetime.datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} +00:00"
 
 
 def get_date_from_past(n: int, reference_date: str | None = None) -> str:
@@ -223,3 +226,38 @@ def loadCoeffsJSON(path) -> dict:
                 print(path)
                 raise
     return {**var_all}
+
+
+def interpolate_2d_nearest(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ma.MaskedArray,
+    x_new: np.ndarray,
+    y_new: np.ndarray,
+) -> np.ma.MaskedArray:
+    """2D nearest neighbor interpolation preserving mask.
+
+    Args:
+        x: 1D array, x-coordinates.
+        y: 1D array, y-coordinates.
+        z: 2D masked array, data values.
+        x_new: 1D array, new x-coordinates.
+        y_new: 1D array, new y-coordinates.
+
+    Returns:
+        Interpolated 2D masked array.
+
+    Notes:
+        Points outside the original range will be interpolated but masked.
+
+    """
+    data = np.ma.filled(z, np.nan)
+    fun = RegularGridInterpolator(
+        (x, y),
+        data,
+        method="linear",
+        bounds_error=False,
+    )
+    xx, yy = np.meshgrid(x_new, y_new)
+    zz = fun((xx, yy)).T
+    return np.ma.masked_where(np.isnan(zz), zz)
