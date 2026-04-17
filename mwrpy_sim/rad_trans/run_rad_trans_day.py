@@ -34,7 +34,9 @@ def rad_trans_day(
         * FillValue
         for _ in range(3)
     )
-    lwp, lwp_pro = (np.ones(len(input_dat["time"][:])) * FillValue for _ in range(2))
+    lwp, lwp_pro = (
+        np.ones(len(input_dat["time"][:]), np.float32) * FillValue for _ in range(2)
+    )
     base, base_pro, top, top_pro = (
         np.ones((len(input_dat["time"][:]), 15), np.float32) * FillValue
         for _ in range(4)
@@ -66,18 +68,16 @@ def rad_trans_day(
                 )
                 if method == "prognostic":
                     lwc_tmp[itx, :] = input_dat["lwc_in"][itx, :]
-                    cloud_column.lwc = lwc_tmp[itx, :]
-                    lwp_tmp[itx] = cloud_column.calculate_lwp()
+                    cloud_column.lwc = lwc_tmp[itx, :] * 1000.0
                 elif method == "detected":
                     lwc_tmp[itx, :] = cloud_column.calculate_lwc() / 1000.0
-                    lwp_tmp[itx] = cloud_column.calculate_lwp() / 1000.0
+                lwp_tmp[itx] = float(cloud_column.calculate_lwp() / 1000.0)
                 c_top, c_base = _get_cloud_top_base(lwc_tmp[itx, :])
                 if len(c_top) in np.arange(15) + 1:
                     top_tmp[itx, 0 : len(c_top)], base_tmp[itx, 0 : len(c_base)] = (
                         input_dat["height"][c_top],
                         input_dat["height"][c_base],
                     )
-
                 elif len(c_top) > 15:
                     continue
 
