@@ -21,7 +21,10 @@ from mwrpy_sim.utils import seconds_since_epoch
 
 
 def prepare_cn(
-    cn_data: dict, index: int | np.ndarray, date_i: str | list, add_2m: bool = True
+    cn_data: nc.Dataset,
+    index: int | np.ndarray,
+    date_i: str | list,
+    add_2m: bool = True,
 ) -> dict:
     """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
     hasl = metpy.calc.geopotential_to_height(
@@ -56,7 +59,7 @@ def prepare_cn(
 
 
 def _add_2m_fields(
-    cn_data: dict, input_cn: dict, index: int | np.ndarray, hasl: float
+    cn_data: nc.Dataset, input_cn: dict, index: int | np.ndarray, hasl: float
 ) -> dict:
     """Add 2m fields to input."""
     if "sfc_dewpoint_temp_2m" in cn_data.keys():
@@ -513,14 +516,9 @@ def check_height_day(input_dict: dict, altitude: float, tolerance: float = 5.0) 
     input_dict["lwc_in"][input_dict["lwc_in"] < 1e-8] = 0.0
 
     input_dict["iwv"] = (
-        np.ma.array(
-            [
-                hum_to_iwv(
-                    input_dict["absolute_humidity"],
-                    input_dict["height"],
-                )
-            ],
-            dtype=np.float64,
+        hum_to_iwv(
+            input_dict["absolute_humidity"],
+            input_dict["height"],
         )
         if not np.any(input_dict["absolute_humidity"].mask)
         else np.ma.array(np.ones(len(input_dict["time"])) * np.nan)

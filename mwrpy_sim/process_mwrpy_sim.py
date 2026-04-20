@@ -88,21 +88,25 @@ def process_input(
                     if len(cn_data["time"]) == 25 and np.all(
                         ~cn_data["temperature"][:-1, 0].mask
                     ):
-                        cn_dict = {
-                            var: np.squeeze(cn_data.variables[var][:])
-                            for var in cn_data.variables
-                        }
+                        logging.info(
+                            f"Radiative transfer using {source} data for {site}, {date}"
+                        )
                         date_arr = [
                             datetime.datetime.combine(
                                 date, datetime.time(int(hour))
                             ).strftime("%Y%m%d%H")
-                            for hour in cn_dict["time"][:-1]
+                            for hour in cn_data["time"][:-1]
                         ]
                         input_cn = prep.prepare_cn(
-                            cn_dict, np.arange(24), date_arr, False
+                            cn_data, np.arange(24), date_arr, False
                         )
                         input_cn = prep.check_height_day(input_cn, params["altitude"])
-                        data_nc = rad_trans_day(input_cn, params)
+                        try:
+                            output_day = rad_trans_day(input_cn, params)
+                        except ValueError:
+                            logging.info(f"Skipping day {date_arr[0][:8]}")
+                            continue
+                        data_nc = append_data(data_nc, output_day)
 
     elif source == "era5" and config["era5"][:] == "model":
         file_names = np.array([], dtype=str)
