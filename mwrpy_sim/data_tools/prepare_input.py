@@ -22,32 +22,29 @@ from mwrpy_sim.utils import seconds_since_epoch
 
 def prepare_cn(
     cn_data: nc.Dataset,
-    index: int | np.ndarray,
-    date_i: str | list,
-    add_2m: bool = True,
+    date_i: list,
+    add_2m: bool = False,
 ) -> dict:
     """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
     hasl = metpy.calc.geopotential_to_height(
-        units.Quantity(cn_data["sfc_geopotential"][index], "m^2/s^2")
+        units.Quantity(cn_data["sfc_geopotential"][:], "m^2/s^2")
     ).magnitude
     input_cn = {
-        "height": cn_data["height"][index, :]
-        + np.resize(hasl, cn_data["height"][index, :].shape),
-        "air_temperature": cn_data["temperature"][index, :],
-        "air_pressure": cn_data["pressure"][index, :],
-        "relative_humidity": cn_data["rh"][index, :],
+        "height": cn_data["height"][:-1, :]
+        + np.resize(hasl, cn_data["height"][:-1, :].shape),
+        "air_temperature": cn_data["temperature"][:-1, :],
+        "air_pressure": cn_data["pressure"][:-1, :],
+        "relative_humidity": cn_data["rh"][:-1, :],
     }
-    input_cn["lwc_in"] = cn_data["ql"][index, :] * moist_rho_rh(
+    input_cn["lwc_in"] = cn_data["ql"][:-1, :] * moist_rho_rh(
         input_cn["air_pressure"],
         input_cn["air_temperature"],
         input_cn["relative_humidity"],
     )
     if add_2m:
-        input_cn = _add_2m_fields(cn_data, input_cn, index, hasl)
-    input_cn["time"] = (
-        np.array(seconds_since_epoch(date_i), dtype=np.int64)
-        if isinstance(date_i, str)
-        else np.array([seconds_since_epoch(d_str) for d_str in date_i], dtype=np.int64)
+        input_cn = _add_2m_fields(cn_data, input_cn, hasl)
+    input_cn["time"] = np.array(
+        [seconds_since_epoch(d_str) for d_str in date_i], dtype=np.int64
     )
     check_len = 138 if add_2m else 137
     n_h = (
@@ -58,9 +55,7 @@ def prepare_cn(
     return _add_std_atm(input_cn, h_val=90.0) if n_h == check_len else {}
 
 
-def _add_2m_fields(
-    cn_data: nc.Dataset, input_cn: dict, index: int | np.ndarray, hasl: float
-) -> dict:
+def _add_2m_fields(cn_data: nc.Dataset, input_cn: dict, hasl: float) -> dict:
     """Add 2m fields to input."""
     if "sfc_dewpoint_temp_2m" in cn_data.keys():
         rh_sfc = np.array(
@@ -92,26 +87,26 @@ def _add_2m_fields(
     lwc_0 = (
         input_cn["lwc_in"][0]
         if input_cn["height"].ndim == 1
-        else input_cn["lwc_in"][:, 0]
+        else input_cn["lwc_in"][:-1, 0]
     )
     input_cn = {
         "height": np.insert(input_cn["height"], 0, 2.0 + hasl, axis=ax),
         "air_temperature": np.insert(
             input_cn["air_temperature"],
             0,
-            cn_data["sfc_temp_2m"][index],
+            cn_data["sfc_temp_2m"][:-1],
             axis=ax,
         ),
         "air_pressure": np.insert(
             input_cn["air_pressure"],
             0,
-            cn_data["sfc_pressure"][index],
+            cn_data["sfc_pressure"][:-1],
             axis=ax,
         ),
         "relative_humidity": np.insert(
             input_cn["relative_humidity"],
             0,
-            rh_sfc[index],
+            rh_sfc[:-1],
             axis=ax,
         ),
         "lwc_in": np.insert(
@@ -505,11 +500,6 @@ def check_height_day(input_dict: dict, altitude: float, tolerance: float = 5.0) 
                     )
                     input_dict[key][itx, :] = np.ma.concatenate(
                         [f(height_new[ind_h]), input_dict[key][itx, ~ind_h].data]
-                    )
-                    input_dict[key][itx, :] = np.interp(
-                        input_dict["height"][itx, :],
-                        height_new,
-                        input_dict[key][itx, :],
                     )
 
     input_dict["height"] = height_new

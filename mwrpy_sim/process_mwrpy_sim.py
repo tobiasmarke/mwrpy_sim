@@ -97,9 +97,7 @@ def process_input(
                             ).strftime("%Y%m%d%H")
                             for hour in cn_data["time"][:-1]
                         ]
-                        input_cn = prep.prepare_cn(
-                            cn_data, np.arange(24), date_arr, False
-                        )
+                        input_cn = prep.prepare_cn(cn_data, date_arr)
                         input_cn = prep.check_height_day(input_cn, params["altitude"])
                         try:
                             output_day = rad_trans_day(input_cn, params)
