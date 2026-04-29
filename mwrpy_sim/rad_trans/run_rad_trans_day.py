@@ -49,11 +49,13 @@ def rad_trans_day(
         else ("detected", "clear")
     )
     for method in cloud_methods:
-        lwc_tmp, lwp_tmp, base_tmp, top_tmp = (
+        lwc_tmp, lwp_tmp, base_tmp, top_tmp, irt_tmp = (
             np.zeros(input_dat["air_temperature"][:].shape, np.float32),
             np.zeros(len(input_dat["time"][:]), np.float32),
             np.ones((len(input_dat["time"][:]), 15), np.int32) * FillValue,
             np.ones((len(input_dat["time"][:]), 15), np.int32) * FillValue,
+            np.ones((len(input_dat["time"][:]), len(params["wavelength"])), np.float32)
+            * FillValue,
         )
         if method in ("prognostic", "detected"):
             for itx, _ in enumerate(input_dat["time"]):
@@ -115,9 +117,11 @@ def rad_trans_day(
                 ),
             )
             irt_tmp = run_pool(ds, 24, run_rad_trans_ir, params).to_numpy()
-        else:
-            irt_tmp = np.ones((len(params["wavelength"])), np.float32) * FillValue
-
+        irt_tmp = (
+            np.ones((len(input_dat["time"][:]), len(params["wavelength"])), np.float32)
+            if irt_tmp.shape != irt.shape
+            else irt_tmp
+        )
         if method == "prognostic":
             (
                 lwp_pro,

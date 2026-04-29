@@ -77,7 +77,7 @@ def calculate_IR_band_TB(
 
     umu = np.cos(np.radians(90 + np.array([90])))
 
-    irt_tmp = np.ones((len(params["wavelength"])), np.float32) * -999.0
+    irt_tmp = np.ones((len(params["wavelength"])), np.float32) * np.nan
     for ind, wvl in enumerate(params["wavelength"]):
         if wvl == 10.5:
             wavelengths = "9300 11900"
