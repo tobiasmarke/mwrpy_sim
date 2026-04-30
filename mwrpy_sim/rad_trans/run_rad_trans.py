@@ -1,5 +1,7 @@
 import numpy as np
 import xarray as xr
+from openMWR.cloud import CloudColumn, CloudModelConfig
+from openMWR.run_RT import _get_cloud_top_base
 from torchMWRT import AtmProfile, RTModel
 
 from mwrpy_sim.data_tools.cloud_mod import (
@@ -49,19 +51,27 @@ def rad_trans(
     )
     for method in cloud_methods:
         if method in ("prognostic", "detected"):
-            top_tmp, base_tmp = (
-                detect_cloud_mod(input_dat["height"][:], input_dat["lwc_in"][:])
-                if method == "prognostic"
-                else (
-                    detect_liq_cloud(
-                        input_dat["height"][:],
-                        input_dat["air_temperature"][:],
-                        input_dat["relative_humidity"][:],
-                    )
-                )
+            cloud_column = CloudColumn(
+                input_dat["height"][:],
+                input_dat["air_pressure"][:],
+                input_dat["air_temperature"][:],
+                input_dat["relative_humidity"][:],
+                CloudModelConfig(
+                    karstens=True,
+                ),
             )
-            if len(top_tmp) in np.arange(15) + 1:
-                lwc_tmp, lwp_tmp = get_cloud_prop(base_tmp, top_tmp, input_dat, method)
+            if method == "prognostic":
+                lwc_tmp[:] = input_dat["lwc_in"][:]
+                cloud_column.lwc = lwc_tmp[:] * 1000.0
+            elif method == "detected":
+                lwc_tmp[:] = cloud_column.calculate_lwc() / 1000.0
+            lwp_tmp = float(cloud_column.calculate_lwp() / 1000.0)
+            c_top, c_base = _get_cloud_top_base(lwc_tmp[:])
+            if len(c_top) in np.arange(15) + 1:
+                top_tmp[0 : len(c_top)], base_tmp[0 : len(c_base)] = (
+                    input_dat["height"][c_top],
+                    input_dat["height"][c_base],
+                )
             elif len(top_tmp) > 15:
                 continue
 

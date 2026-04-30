@@ -56,9 +56,9 @@ Arguments:
 Supported data sources are:
 
 | Input Type            | Description                    |
-| :-------------------- | :----------------------------- |
+|:----------------------|:-------------------------------|
 | `ifs`                 | IFS data from ECMWF.           |
-| `radiosonde`          | Radiosonde data from DWD.      |
+| `gruan`               | GRUAN radiosonde data.         |
 | `vaisala`             | Vaisala radiosonde data.       |
 | `era5`                | ERA5 data from ECMWF.          |
 | `get_era5`            | Download ERA5 data from ECMWF. |

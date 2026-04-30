@@ -185,26 +185,27 @@ def process_input(
                         continue
                     data_nc = append_data(data_nc, output_hour)
 
-    elif source == "radiosonde":
+    elif source == "gruan":
         for date in date_range(start_date, stop_date):
             f_names = get_file_list(
-                params["data_rs"] + date.strftime("%Y/%m/%d/"), "radiosonde"
+                params["data_rs"] + date.strftime("%Y/"), "RS41-GDP"
             )
-            for file in f_names:
-                if os.path.isfile(file):
+            day_files = [s for s in f_names if date.strftime("%Y%m%d") in s]
+            if len(day_files) > 0:
+                for file in day_files:
+                    if file == day_files[0]:
+                        logging.info(
+                            f"Radiative transfer using {source} data "
+                            f"for {site}, {date.strftime('%Y%m%d')}"
+                        )
                     with nc.Dataset(file) as rs_data:
-                        if file == f_names[0]:
-                            logging.info(
-                                f"Radiative transfer using {source} data "
-                                f"for {site}, {date.strftime('%Y%m%d')}"
-                            )
-                        input_rs = prep.prepare_radiosonde(rs_data)
-                    try:
-                        output_hour = call_rad_trans(input_rs, params)
-                    except ValueError:
-                        logging.info(f"Skipping file {file}")
-                        continue
-                    data_nc = append_data(data_nc, output_hour)
+                        input_rs = prep.prepare_gruan(rs_data)
+                        try:
+                            output_hour = call_rad_trans(input_rs, params)
+                        except Exception as e:
+                            logging.info(f"Skipping file {file}: {e}")
+                            continue
+                        data_nc = append_data(data_nc, output_hour)
 
     elif source == "vaisala":
         for date in date_range(start_date, stop_date):
@@ -226,41 +227,6 @@ def process_input(
                             output_hour = call_rad_trans(input_vs, params)
                         except ValueError:
                             logging.info(f"Skipping file {file_name[0]}")
-                            continue
-                        data_nc = append_data(data_nc, output_hour)
-
-    elif source == "icon":
-        for date in date_range(start_date, stop_date):
-            file_name = get_file_list(
-                params["data_icon"]
-                + date.strftime("%Y/")
-                + date.strftime("%m/")
-                + date.strftime("%Y%m%d")
-                + "_r600m_f2km/",
-                "METEOGRAM_patch001_" + date.strftime("%Y%m%d") + "_joyce",
-            )
-            if os.path.isfile(file_name[0]) and os.path.getsize(file_name[0]) > 0:
-                with nc.Dataset(file_name[0]) as icon_data:
-                    _, hour_index, _ = np.intersect1d(
-                        icon_data["time"][:].data / 3600.0,
-                        np.linspace(0, 23, 24),
-                        return_indices=True,
-                    )
-                    for index in hour_index:
-                        date_i = datetime.datetime.combine(
-                            date,
-                            datetime.time(int(icon_data["time"][index].data / 3600.0)),
-                        ).strftime("%Y%m%d%H")
-                        if date_i[-2:] == "00":
-                            logging.info(
-                                f"Radiative transfer using {source} data "
-                                f"for {site}, {date_i[:-2]}"
-                            )
-                        input_icon = prep.prepare_icon(icon_data, index, date_i)
-                        try:
-                            output_hour = call_rad_trans(input_icon, params)
-                        except ValueError:
-                            logging.info(f"Skipping time {date_i}")
                             continue
                         data_nc = append_data(data_nc, output_hour)
 

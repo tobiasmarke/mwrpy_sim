@@ -22,10 +22,9 @@ def get_data_attributes(sim_variables: dict, source: str) -> dict:
     """
     if source not in (
         "ifs",
-        "radiosonde",
+        "gruan",
         "vaisala",
         "era5",
-        "icon",
         "standard_atmosphere",
     ):
         raise RuntimeError([source + " not supported for file writing."])

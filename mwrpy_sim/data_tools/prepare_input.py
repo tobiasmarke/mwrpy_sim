@@ -9,7 +9,6 @@ import numpy as np
 from metpy.units import units
 from scipy.interpolate import CubicSpline
 
-import mwrpy_sim.constants as con
 from mwrpy_sim.atmos import (
     abs_hum,
     era5_geopot,
@@ -191,20 +190,28 @@ def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
     return _add_std_atm(input_era5)
 
 
-def prepare_radiosonde(rs_data: nc.Dataset) -> dict:
+def prepare_gruan(rs_data: nc.Dataset) -> dict:
     """Prepare input data from RS41-GDP radiosonde measurements."""
-    input_rs: dict = {}
-    geopotential = units.Quantity(rs_data["geopotential_height"][:] * con.g0, "m^2/s^2")
-    input_rs["height"] = metpy.calc.geopotential_to_height(geopotential[:]).magnitude
-    input_rs["height"] = input_rs["height"][:]
-    input_rs["air_temperature"] = rs_data["air_temperature"][:] + con.T0
-    input_rs["relative_humidity"] = rs_data["relative_humidity"][:] / 100.0
-    input_rs["air_pressure"] = rs_data["air_pressure"][:] * 100.0
-    input_rs["time"] = np.array(
-        seconds_since_epoch(rs_data.BEZUGSDATUM_SYNOP), dtype=np.int64
+    height, ind_s = np.sort(rs_data["alt_amsl"]), np.argsort(rs_data["alt_amsl"])
+    _, ind = np.unique(height, return_index=True, equal_nan=True)
+    ind = ind_s[ind]
+    ind = ind[~np.isnan(rs_data["temp"][ind])]
+    if len(ind) < 2500 or rs_data["alt_amsl"][ind[-2]] < 15000.0:
+        return {}
+    time = datetime.datetime.strptime(
+        rs_data.__dict__["g.Measurement.StartTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
     )
-
-    return _add_std_atm(input_rs)
+    input_rs = {
+        "height": rs_data["alt_amsl"][ind[:2500:5]],
+        "air_temperature": rs_data["temp"][ind[:2500:5]],
+        "relative_humidity": rs_data["rh"][ind[:2500:5]] / 100.0,
+        "air_pressure": rs_data["press"][ind[:2500:5]] * 100.0,
+        "time": np.array(
+            [seconds_since_epoch(datetime.datetime.strftime(time, "%Y%m%d%H%M"))],
+            dtype=np.int64,
+        ),
+    }
+    return _add_std_atm(input_rs, 35.0)
 
 
 def prepare_vaisala(vs_data: nc.Dataset, altitude: float = 0.0) -> dict:
@@ -239,25 +246,6 @@ def prepare_vaisala(vs_data: nc.Dataset, altitude: float = 0.0) -> dict:
     }
 
     return _add_std_atm(input_vs, 50.0)
-
-
-def prepare_icon(icon_data: nc.Dataset, index: int, date_i: str) -> dict:
-    """Prepare input data from ICON model (METEOGRAM)."""
-    input_icon: dict = {
-        "height": np.flip(icon_data["height_2"][:]) - icon_data["height_2"][-1],
-        "air_temperature": np.flip(icon_data["T"][index, :]),
-        "air_pressure": np.flip(icon_data["P"][index, :]),
-        "relative_humidity": np.flip(icon_data["REL_HUM"][index, :]) / 100.0,
-    }
-    input_icon["lwc_in"] = np.flip(icon_data["QC"][index, :]) * moist_rho_rh(
-        input_icon["air_pressure"],
-        input_icon["air_temperature"],
-        input_icon["relative_humidity"],
-    )
-    input_icon["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
-    input_icon["iwv"] = icon_data["TQV"][index]
-
-    return _add_std_atm(input_icon)
 
 
 def prepare_standard_atmosphere(prof: int = 5) -> dict:
@@ -345,7 +333,7 @@ def _add_std_atm(input_dat: dict, h_val: float = 100.0, prof: int = 5) -> dict:
                             ),
                         )
                     )
-            else:
+            elif var != "lwc_in" and var in input_dat:
                 sa_add = (
                     sa[var][ind_sa]
                     if input_dat[var].ndim == 1
@@ -429,7 +417,8 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 5.0) -> d
                 input_dict[key] = np.ma.asarray(
                     np.concatenate([f(height_new), input_dict[key][~ind_h].data])
                 )
-        input_dict["lwc_in"][input_dict["lwc_in"] < 1e-8] = 0.0
+        if "lwc_in" in input_dict:
+            input_dict["lwc_in"][input_dict["lwc_in"] < 1e-8] = 0.0
         input_dict["height"] = np.concatenate(
             [height_new, input_dict["height"][~ind_h]]
         )
