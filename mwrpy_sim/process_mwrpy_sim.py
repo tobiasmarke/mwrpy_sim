@@ -190,8 +190,17 @@ def process_input(
             f_names = get_file_list(
                 params["data_rs"] + date.strftime("%Y/"), "RS41-GDP"
             )
-            day_files = [s for s in f_names if date.strftime("%Y%m%d") in s]
-            if len(day_files) > 0:
+            day_files1 = [s for s in f_names if date.strftime("%Y%m%d") in s]
+            if len(day_files1) > 0:
+                day_files = []
+                for hh in ["00", "06", "12", "18"]:
+                    tmp = [
+                        s for s in day_files1 if date.strftime("%Y%m%d") + "T" + hh in s
+                    ]
+                    if len(tmp) == 1:
+                        day_files.append(tmp[0])
+                    elif len(tmp) > 1:
+                        day_files.append(tmp[0])
                 for file in day_files:
                     if file == day_files[0]:
                         logging.info(
@@ -200,12 +209,18 @@ def process_input(
                         )
                     with nc.Dataset(file) as rs_data:
                         input_rs = prep.prepare_gruan(rs_data)
-                        try:
-                            output_hour = call_rad_trans(input_rs, params)
-                        except Exception as e:
-                            logging.info(f"Skipping file {file}: {e}")
+                        if len(input_rs) == 0:
+                            logging.info(
+                                f"Minimum altitude of 10 km not reached. Skipping file {file}"
+                            )
                             continue
-                        data_nc = append_data(data_nc, output_hour)
+                        else:
+                            try:
+                                output_hour = call_rad_trans(input_rs, params)
+                            except Exception as e:
+                                logging.info(f"Skipping file {file}: {e}")
+                                continue
+                            data_nc = append_data(data_nc, output_hour)
 
     elif source == "vaisala":
         for date in date_range(start_date, stop_date):

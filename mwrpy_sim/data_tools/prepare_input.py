@@ -3,19 +3,13 @@
 import datetime
 import os
 
-import metpy.calc
+import atmoslib
 import netCDF4 as nc
 import numpy as np
-from metpy.units import units
+import pandas as pd
+from atmoslib import constants as con
 from scipy.interpolate import CubicSpline
 
-from mwrpy_sim.atmos import (
-    abs_hum,
-    era5_geopot,
-    hum_to_iwv,
-    moist_rho_rh,
-    q2rh,
-)
 from mwrpy_sim.utils import seconds_since_epoch
 
 
@@ -25,9 +19,7 @@ def prepare_cn(
     add_2m: bool = False,
 ) -> dict:
     """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
-    hasl = metpy.calc.geopotential_to_height(
-        units.Quantity(cn_data["sfc_geopotential"][:], "m^2/s^2")
-    ).magnitude
+    hasl = atmoslib.geometric_height(cn_data["sfc_geopotential"][:] / con.G)
     input_cn = {
         "height": cn_data["height"][:-1, :]
         + np.resize(hasl, cn_data["height"][:-1, :].shape),
@@ -35,10 +27,10 @@ def prepare_cn(
         "air_pressure": cn_data["pressure"][:-1, :],
         "relative_humidity": cn_data["rh"][:-1, :],
     }
-    input_cn["lwc_in"] = cn_data["ql"][:-1, :] * moist_rho_rh(
-        input_cn["air_pressure"],
-        input_cn["air_temperature"],
-        input_cn["relative_humidity"],
+    vp = atmoslib.vapor_pressure(input_cn["air_pressure"], cn_data["q"][:-1, :])
+    mr = atmoslib.mixing_ratio(vp, input_cn["air_pressure"])
+    input_cn["lwc_in"] = cn_data["ql"][:-1, :] * atmoslib.air_density(
+        input_cn["air_temperature"], input_cn["air_pressure"], mr
     )
     if add_2m:
         input_cn = _add_2m_fields(cn_data, input_cn, hasl)
@@ -56,30 +48,21 @@ def prepare_cn(
 
 def _add_2m_fields(cn_data: nc.Dataset, input_cn: dict, hasl: float) -> dict:
     """Add 2m fields to input."""
-    if "sfc_dewpoint_temp_2m" in cn_data.keys():
-        rh_sfc = np.array(
-            [
-                float(
-                    metpy.calc.relative_humidity_from_dewpoint(
-                        units.Quantity(cn_data["sfc_temp_2m"][ind], "K"),
-                        units.Quantity(cn_data["sfc_dewpoint_temp_2m"][ind], "K"),
-                    ).magnitude
-                )
-                for ind in np.arange(len(cn_data["sfc_dewpoint_temp_2m"]))
-            ]
+    if "sfc_dewpoint_temp_2m" in cn_data.variables:
+        nn = np.exp(
+            (17.625 * atmoslib.k2c(cn_data["sfc_dewpoint_temp_2m"][:]))
+            / (243.04 + atmoslib.k2c(cn_data["sfc_dewpoint_temp_2m"][:]))
         )
+        dn = np.exp(
+            (17.625 * atmoslib.k2c(cn_data["sfc_temp_2m"][:]))
+            / (243.04 + atmoslib.k2c(cn_data["sfc_temp_2m"][:]))
+        )
+        rh_sfc = nn / dn
     else:
-        rh_sfc = np.array(
-            [
-                float(
-                    metpy.calc.relative_humidity_from_specific_humidity(
-                        units.Quantity(cn_data["sfc_pressure"][ind], "Pa"),
-                        units.Quantity(cn_data["sfc_temp_2m"][ind], "K"),
-                        cn_data["sfc_q_2m"][ind],
-                    ).magnitude
-                )
-                for ind in np.arange(len(cn_data["sfc_q_2m"]))
-            ]
+        rh_sfc = atmoslib.relative_humidity(
+            cn_data["sfc_temp_2m"][:],
+            cn_data["sfc_pressure"][:],
+            cn_data["sfc_q_2m"][:],
         )
 
     ax = 0 if input_cn["height"].ndim == 1 else 1
@@ -118,6 +101,52 @@ def _add_2m_fields(cn_data: nc.Dataset, input_cn: dict, hasl: float) -> dict:
     return input_cn
 
 
+def era5_geopot(level, ps, gpot, temp, hum) -> tuple[np.ndarray, np.ndarray]:
+    """Compute geopotential height and pressure from ERA5 model levels.
+    Adapted from compute_geopotential_on_ml.py, Copyright 2023 ECMWF.
+
+    Input:
+        level: Model level
+        ps: Surface Pressure
+        gpot: Geopotential Height at Surface
+        temp: Temperature
+        hum: Humidity
+    Output:
+        z_f: Geopotential height on model levels
+        pres: Pressure on model levels
+    """
+    file_mh = (
+        os.path.dirname(os.path.realpath(__file__))
+        + "/data_tools/era5_download/era5_model_levels_137.csv"
+    )
+    mod_lvl = pd.read_csv(file_mh)
+    a_cf = mod_lvl["a [Pa]"].values[:].astype("float")
+    b_cf = mod_lvl["b"].values[:].astype("float")
+    z_f = np.empty(len(level), np.float32)
+
+    p_h = a_cf + b_cf * ps
+    pres = (p_h + np.roll(p_h, 1, axis=0))[1:] / 2
+
+    level_i = np.array(sorted(level.astype(int), reverse=True))
+    for lev in level_i:
+        i_z = np.where(level == lev)[0]
+        p_l = a_cf[lev - 1] + (b_cf[lev - 1] * ps)
+        p_lp = a_cf[lev] + (b_cf[lev] * ps)
+
+        if lev == 1:
+            dlog_p = np.log(p_lp / 0.1)
+            alpha = np.log(2)
+        else:
+            dlog_p = np.log(p_lp / p_l)
+            alpha = 1.0 - ((p_l / (p_lp - p_l)) * dlog_p)
+
+        temp[i_z] = (temp[i_z] * (1.0 + 0.609133 * hum[i_z])) * 287.058
+        z_f[i_z] = gpot + (temp[i_z] * alpha)
+        gpot += temp[i_z] * dlog_p
+
+    return np.flip(z_f), np.flip(pres)
+
+
 def prepare_era5_mod(
     mod_data_sfc: nc.Dataset, mod_data_pro: nc.Dataset, index: int, date_i: str
 ) -> dict:
@@ -130,30 +159,22 @@ def prepare_era5_mod(
         np.mean(mod_data_pro["t"][index, :, :, :], axis=(1, 2)),
         np.mean(mod_data_pro["q"][index, :, :, :], axis=(1, 2)),
     )
-    geopotential = units.Quantity(geopotential, "m^2/s^2")
-    input_era5["height"] = metpy.calc.geopotential_to_height(geopotential[:]).magnitude
+    input_era5["height"] = atmoslib.geometric_height(geopotential[:] / con.G)
     input_era5["air_temperature"] = np.flip(
         np.mean(mod_data_pro["t"][index, :, :, :], axis=(1, 2))
     )[:]
-    input_era5["relative_humidity"] = (
-        metpy.calc.relative_humidity_from_specific_humidity(
-            input_era5["air_pressure"] * units.Pa,
-            units.Quantity(input_era5["air_temperature"], "K"),
-            np.flip(np.mean(mod_data_pro["q"][index, :, :, :], axis=(1, 2)))[:],
-        ).magnitude
+    q = np.flip(np.mean(mod_data_pro["q"][index, :, :, :], axis=(1, 2)))[:]
+    input_era5["relative_humidity"] = atmoslib.relative_humidity(
+        input_era5["air_temperature"],
+        input_era5["air_pressure"],
+        q,
     )
     clwc = np.flip(np.mean(mod_data_pro["clwc"][index, :, :, :], axis=(1, 2)))[:]
-    mxr = metpy.calc.mixing_ratio_from_relative_humidity(
-        units.Quantity(input_era5["air_pressure"], "Pa"),
-        units.Quantity(input_era5["air_temperature"], "K"),
-        units.Quantity(input_era5["relative_humidity"], "dimensionless"),
+    vp = atmoslib.vapor_pressure(input_era5["air_pressure"], q)
+    mxr = atmoslib.mixing_ratio(vp, input_era5["air_pressure"])
+    input_era5["lwc_in"] = clwc * atmoslib.air_density(
+        input_era5["air_temperature"], input_era5["air_pressure"], mxr
     )
-    rho = metpy.calc.density(
-        units.Quantity(input_era5["air_pressure"], "Pa"),
-        units.Quantity(input_era5["air_temperature"], "K"),
-        mxr,
-    )
-    input_era5["lwc_in"] = clwc * rho.magnitude
     input_era5["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
 
     return _add_std_atm(input_era5)
@@ -163,9 +184,7 @@ def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
     """Prepare input data from ERA5 on pressure levels."""
     input_era5: dict = {}
     geopotential = np.mean(mod_data["z"][index, :, :, :], axis=(1, 2))[:]
-    input_era5["height"] = metpy.calc.geopotential_to_height(
-        units.Quantity(geopotential, "m^2/s^2")
-    ).magnitude
+    input_era5["height"] = atmoslib.geometric_height(geopotential[:] / con.G)
     input_era5["air_pressure"] = mod_data["pressure_level"][:] * 100.0
     input_era5["air_temperature"] = np.mean(mod_data["t"][index, :, :, :], axis=(1, 2))[
         :
@@ -174,17 +193,12 @@ def prepare_era5_pres(mod_data: nc.Dataset, index: int, date_i: str) -> dict:
         np.mean(mod_data["r"][index, :, :, :], axis=(1, 2))[:] / 100.0
     )
     clwc = np.mean(mod_data["clwc"][index, :, :, :], axis=(1, 2))[:]
-    mxr = metpy.calc.mixing_ratio_from_relative_humidity(
-        units.Quantity(input_era5["air_pressure"], "Pa"),
-        units.Quantity(input_era5["air_temperature"], "K"),
-        units.Quantity(input_era5["relative_humidity"], "dimensionless"),
+    q = np.flip(np.mean(mod_data["q"][index, :, :, :], axis=(1, 2)))[:]
+    vp = atmoslib.vapor_pressure(input_era5["air_pressure"], q)
+    mxr = atmoslib.mixing_ratio(vp, input_era5["air_pressure"])
+    input_era5["lwc_in"] = clwc * atmoslib.air_density(
+        input_era5["air_temperature"], input_era5["air_pressure"], mxr
     )
-    rho = metpy.calc.density(
-        units.Quantity(input_era5["air_pressure"], "Pa"),
-        units.Quantity(input_era5["air_temperature"], "K"),
-        mxr,
-    )
-    input_era5["lwc_in"] = clwc * rho.magnitude
     input_era5["time"] = np.array(seconds_since_epoch(date_i), dtype=np.int64)
 
     return _add_std_atm(input_era5)
@@ -196,22 +210,22 @@ def prepare_gruan(rs_data: nc.Dataset) -> dict:
     _, ind = np.unique(height, return_index=True, equal_nan=True)
     ind = ind_s[ind]
     ind = ind[~np.isnan(rs_data["temp"][ind])]
-    if len(ind) < 2500 or rs_data["alt_amsl"][ind[-2]] < 15000.0:
+    if rs_data["alt_amsl"][ind[-2]] < 10000.0:
         return {}
     time = datetime.datetime.strptime(
         rs_data.__dict__["g.Measurement.StartTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
     )
     input_rs = {
-        "height": rs_data["alt_amsl"][ind[:2500:5]],
-        "air_temperature": rs_data["temp"][ind[:2500:5]],
-        "relative_humidity": rs_data["rh"][ind[:2500:5]] / 100.0,
-        "air_pressure": rs_data["press"][ind[:2500:5]] * 100.0,
+        "height": rs_data["alt_amsl"][ind[::10]],
+        "air_temperature": rs_data["temp"][ind[::10]],
+        "relative_humidity": rs_data["rh"][ind[::10]] / 100.0,
+        "air_pressure": rs_data["press"][ind[::10]] * 100.0,
         "time": np.array(
             [seconds_since_epoch(datetime.datetime.strftime(time, "%Y%m%d%H%M"))],
             dtype=np.int64,
         ),
     }
-    return _add_std_atm(input_rs, 35.0)
+    return _add_std_atm(input_rs, np.max(input_rs["height"] / 1000.0) + 1)
 
 
 def prepare_vaisala(vs_data: nc.Dataset, altitude: float = 0.0) -> dict:
@@ -272,10 +286,10 @@ def prepare_standard_atmosphere(prof: int = 5) -> dict:
         "air_pressure": sa_data.variables["p_atmo"][:, prof].astype(np.float64) * 100.0,
         "lwc_in": np.zeros(len(sa_data.variables["height"][:]), dtype=np.float64),
     }
-    input_sa["relative_humidity"] = q2rh(
-        sa_data.variables["q_atmo"][:, prof].astype(np.float64) * 1000.0,
+    input_sa["relative_humidity"] = atmoslib.relative_humidity(
         input_sa["air_temperature"],
         input_sa["air_pressure"],
+        sa_data.variables["q_atmo"][:, prof].astype(np.float64),
     )
     input_sa["time"] = np.array([0], dtype=np.int64)
 
@@ -348,8 +362,15 @@ def _add_std_atm(input_dat: dict, h_val: float = 100.0, prof: int = 5) -> dict:
 
 def _add_vars(input_dat) -> dict:
     """Add variables to input data dictionary."""
-    input_dat["absolute_humidity"] = abs_hum(
-        input_dat["air_temperature"][:], input_dat["relative_humidity"][:]
+    input_dat["relative_humidity"][input_dat["relative_humidity"] < 0.0] = 0.0
+    q = atmoslib.specific_humidity(
+        input_dat["air_temperature"][:],
+        input_dat["air_pressure"][:],
+        input_dat["relative_humidity"][:],
+    )
+    vp = atmoslib.vapor_pressure(input_dat["air_pressure"][:], q)
+    input_dat["absolute_humidity"] = atmoslib.absolute_humidity(
+        input_dat["air_temperature"][:], vp
     )
     for key in input_dat.keys():
         input_dat[key] = np.ma.asarray(input_dat[key])
@@ -504,3 +525,21 @@ def check_height_day(input_dict: dict, altitude: float, tolerance: float = 5.0) 
     )
 
     return input_dict
+
+
+def hum_to_iwv(ahum, height):
+    """Calculate the integrated water vapour.
+
+    Input:
+        ahum is in kg/m^3
+        height is in m
+    Output:
+        iwv in kg/m^2
+    """
+    iwv = (
+        np.sum((ahum[1:] + ahum[:-1]) / 2.0 * np.diff(height))
+        if ahum.ndim == 1
+        else np.sum((ahum[:, 1:] + ahum[:, :-1]) / 2.0 * np.diff(height), axis=1)
+    )
+
+    return iwv

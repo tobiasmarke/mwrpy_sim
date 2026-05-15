@@ -1,8 +1,7 @@
+import atmoslib
 import metpy.calc as mpcalc
 import numpy as np
 from metpy.units import units
-
-from mwrpy_sim.atmos import eq_pot_tem, mixr, t_dew_rh
 
 
 def modify_prof_500m(
@@ -10,7 +9,6 @@ def modify_prof_500m(
     temperature: np.ndarray,
     pressure: np.ndarray,
     dewpoint: np.ndarray,
-    mixing_ratio: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Modify profiles below 500 m with average value.
 
@@ -85,28 +83,26 @@ def calc_stability_indices(data_dict: dict, height: np.ndarray) -> dict:
         output_dict: Dictionary including stability indices.
     """
     # Calculate additional variables
-    mix_rat = mixr(
+    q = atmoslib.specific_humidity(
         data_dict["air_temperature"][:, :],
-        data_dict["absolute_humidity"][:, :],
-        data_dict["air_pressure"][:, 0],
-        height,
+        data_dict["air_pressure"][:, :],
+        data_dict["relative_humidity"][:, :],
     )
-    eq_pot_t = eq_pot_tem(
+    eq_pot_t = atmoslib.equivalent_potential_temperature(
         data_dict["air_temperature"][:, :],
-        mix_rat,
-        data_dict["air_pressure"][:, 0],
-        height,
+        data_dict["air_pressure"][:, :],
+        q,
     )
-    t_dew = t_dew_rh(
+    t_dew = atmoslib.dew_point_temperature(
         data_dict["air_temperature"][:, :], data_dict["relative_humidity"][:, :]
     )
+
     # Modify profiles below 500 m
     t_mod, p_mod, td_mod = modify_prof_500m(
         np.array(height),
         data_dict["air_temperature"][:, :],
         data_dict["air_pressure"][:, :],
         t_dew[:, :],
-        mix_rat[:],
     )
 
     # Calculate stability indices

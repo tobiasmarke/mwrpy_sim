@@ -47,6 +47,8 @@ def plot_sim_data(
                 data = np.ma.masked_equal(data, -999.0)
                 data *= 1000.0 if "lwc" in var_name else 1.0
                 data *= 100.0 if "relative_humidity" in var_name else 1.0
+            if var_name == "iwv":
+                n_prof = int(len(data))
             if meta.source == "c_bnd":
                 _plot_cloud_boundary(
                     ax, data, sim_data.variables["height"][:].data, color, var_name
@@ -61,7 +63,7 @@ def plot_sim_data(
             _set_axis(ax, meta)
 
     # Set the title for the figure
-    _set_title(axes, source, site, date_d, start_d, stop_d)
+    _set_title(axes, source, site, date_d, start_d, stop_d, n_prof)
 
     # Save the figure
     _handle_saving(site, source, date_d, start_d, stop_d, save_path, show)
@@ -123,7 +125,13 @@ def _set_axis(ax, meta: PlotMeta) -> None:
 
 
 def _set_title(
-    axes, source: str, site: str, date_d: str | None, start_d: str, stop_d: str
+    axes,
+    source: str,
+    site: str,
+    date_d: str | None,
+    start_d: str,
+    stop_d: str,
+    n_prof: int,
 ) -> None:
     """Set the title for the figure."""
     if source == "standard_atmosphere":
@@ -133,9 +141,9 @@ def _set_title(
         )
     else:
         axes[1].set_title(
-            f"MWRpy sim data for {site} (source: {source})\nfrom {start_d} to {stop_d}"
+            f"MWRpy sim data for {site} (source: {source})\nfrom {start_d} to {stop_d} (n={n_prof})"
             if not date_d
-            else f"MWRpy simulation data for {site} ({source})\non {date_d}",
+            else f"MWRpy simulation data for {site} ({source})\non {date_d} (n={n_prof})",
             fontsize=16,
         )
 
@@ -155,12 +163,7 @@ def _plot_histogram(
         histtype="step",
         log=True,
     )
-    ax.set_ylim(
-        [
-            np.min([np.nanmin(h[0][h[0] > 0.0], initial=1e-1), 1e-1]),
-            np.max([np.nanmax(h[0][h[0] > 0.0], initial=1e0), 1e0]),
-        ]
-    )
+    ax.set_ylim([1e-3, 1e1])
     ax.yaxis.set_minor_locator(plt.NullLocator())
     y_0 = 0.85 if color == "black" else 0.75
     ax.text(
