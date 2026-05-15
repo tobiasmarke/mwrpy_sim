@@ -19,7 +19,7 @@ def prepare_cn(
     add_2m: bool = False,
 ) -> dict:
     """Prepare input data from ECMWF's IFS or ERA5 model (Cloudnet format)."""
-    hasl = atmoslib.geometric_height(cn_data["sfc_geopotential"][:] / con.G)
+    hasl = atmoslib.geometric_height(cn_data["sfc_geopotential"][:-1] / con.G)
     input_cn = {
         "height": cn_data["height"][:-1, :]
         + np.resize(hasl, cn_data["height"][:-1, :].shape),
@@ -46,7 +46,7 @@ def prepare_cn(
     return _add_std_atm(input_cn, h_val=90.0) if n_h == check_len else {}
 
 
-def _add_2m_fields(cn_data: nc.Dataset, input_cn: dict, hasl: float) -> dict:
+def _add_2m_fields(cn_data: nc.Dataset, input_cn: dict, hasl: np.ndarray) -> dict:
     """Add 2m fields to input."""
     if "sfc_dewpoint_temp_2m" in cn_data.variables:
         nn = np.exp(
