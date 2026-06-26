@@ -18,18 +18,11 @@ _KGM3 = "kg m$^{-3}$"
 _GM2 = "g m$^{-2}$"
 _GM3 = "g m$^{-3}$"
 _PP = "%"
-_hPa = "hPa"
 
 # Attributes define order of plots.
 ATTRIBUTES = {
     "lwp": PlotMeta(
         name="LWP",
-        xlabel=_KGM2,
-        plot_range=(0.0, 1.9),
-        source="1d",
-    ),
-    "lwp_pro": PlotMeta(
-        name="LWP (prognostic)",
         xlabel=_KGM2,
         plot_range=(0.0, 1.9),
         source="1d",
@@ -40,17 +33,29 @@ ATTRIBUTES = {
         plot_range=(0, 50),
         source="1d",
     ),
+    "irt": PlotMeta(
+        name="Infrared brightness temperature",
+        xlabel=_K,
+        plot_range=(120.0, 350.0),
+        source="1d",
+    ),
     "lwc": PlotMeta(
         name="LWC",
         xlabel=_GM3,
         plot_range=(0.0, 0.3),
         source="profile",
     ),
-    "lwc_pro": PlotMeta(
-        name="LWC (prognostic)",
-        xlabel=_GM3,
-        plot_range=(0.0, 0.3),
-        source="profile",
+    "cbh": PlotMeta(
+        name="Cloud base height occurrence",
+        xlabel=_PP,
+        plot_range=(0.0, 10.0),
+        source="c_bnd",
+    ),
+    "cth": PlotMeta(
+        name="Cloud top height occurrence",
+        xlabel=_PP,
+        plot_range=(0.0, 10.0),
+        source="c_bnd",
     ),
     "relative_humidity": PlotMeta(
         name="Relative humidity",
@@ -68,12 +73,6 @@ ATTRIBUTES = {
         name="Air temperature",
         xlabel=_K,
         plot_range=(200.0, 320.0),
-        source="profile",
-    ),
-    "air_pressure": PlotMeta(
-        name="Air pressure",
-        xlabel=_hPa,
-        plot_range=(0.0, 1200.0),
         source="profile",
     ),
 }

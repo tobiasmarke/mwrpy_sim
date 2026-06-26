@@ -44,10 +44,9 @@ def _parse_args(args):
         type=str,
         choices=[
             "ifs",
-            "radiosonde",
+            "gruan",
             "vaisala",
             "era5",
-            "icon",
             "get_era5",
             "standard_atmosphere",
         ],
