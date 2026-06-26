@@ -22,10 +22,9 @@ def get_data_attributes(sim_variables: dict, source: str) -> dict:
     """
     if source not in (
         "ifs",
-        "radiosonde",
+        "gruan",
         "vaisala",
         "era5",
-        "icon",
         "standard_atmosphere",
     ):
         raise RuntimeError([source + " not supported for file writing."])
@@ -79,6 +78,11 @@ ATTRIBUTES_COM = {
         units="degree",
         comment="0=horizon, 90=zenith",
         dimensions=("elevation_angle",),
+    ),
+    "cloud_layer": MetaData(
+        long_name="Cloud layer for cloud boundaries.",
+        units="1",
+        dimensions=("cloud_layer",),
     ),
 }
 
@@ -177,25 +181,31 @@ ATTRIBUTES_SOURCE = {
         long_name="Cloud base heights above mean sea level derived from ",
         standard_name="cloud_base_height_above_mean_sea_level",
         units="m",
-        dimensions=("time",),
+        dimensions=("time", "cloud_layer"),
     ),
     "cbh_pro": MetaData(
         long_name="Cloud base heights above mean sea level (prognostic) derived from ",
         standard_name="cloud_base_height_above_mean_sea_level",
         units="m",
-        dimensions=("time",),
+        dimensions=("time", "cloud_layer"),
     ),
     "cth": MetaData(
         long_name="Cloud top heights above mean sea level derived from ",
         standard_name="cloud_top_height_above_mean_sea_level",
         units="m",
-        dimensions=("time",),
+        dimensions=("time", "cloud_layer"),
     ),
     "cth_pro": MetaData(
         long_name="Cloud top heights above mean sea level (prognostic) derived from ",
         standard_name="cloud_top_height_above_mean_sea_level",
         units="m",
-        dimensions=("time",),
+        dimensions=("time", "cloud_layer"),
+    ),
+    "weighting_function": MetaData(
+        long_name="Weighting function derived from ",
+        standard_name="weighting_function",
+        units="m-1",
+        dimensions=("time", "frequency", "height"),
     ),
     "k_index": MetaData(
         long_name="K-index derived from ",

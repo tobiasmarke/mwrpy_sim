@@ -14,6 +14,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
+  "atmoslib",
   "cdsapi",
   "matplotlib",
   "metpy",
@@ -22,12 +23,12 @@ dependencies = [
   "pandas",
   "pysonde",
   "scipy",
-  "suncalc",
+  "xarray",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["mypy", "pytest", "pytest-flakefinder", "ruff", "types-PyYAML", "types-pytz"]
+test = ["mypy", "pytest", "pytest-flakefinder", "ruff", "types-PyYAML"]
 dev = ["pre-commit", "release-version"]
 
 [project.scripts]
@@ -43,17 +44,19 @@ check_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
+  "atmoslib.*",
   "cdsapi.*",
   "matplotlib.*",
   "metpy.*",
   "netCDF4.*",
   "numpy.*",
+  "openMWR.*",
   "pandas.*",
-  "pylblrtm.*",
+  "pyrtlib.*",
   "pysonde.*",
   "scipy.*",
-  "suncalc.*",
-  "yaml.*",
+  "torchMWRT.*",
+  "xarray.*",
 ]
 ignore_missing_imports = true
 

@@ -30,32 +30,40 @@ def plot_sim_data(
     :return:
     """
     fig, axes = _initialize_figure(3, 3, dpi)
+    methods = ("detected", "prognostic")
     for ax, (var_name, meta) in zip(axes, ATTRIBUTES.items()):
-        if var_name not in sim_data.variables and meta.source == "profile":
-            data = np.ones((1, sim_data.dimensions["height"].size)) * np.nan
-        elif var_name not in sim_data.variables and meta.source == "1d":
-            data = np.ones((1,)) * np.nan
-        else:
-            data = sim_data.variables[var_name][:].data
-            data = np.ma.masked_equal(data, -999.0)
-            data *= 1000.0 if "lwc" in var_name else 1.0
-            data /= 100.0 if "air_pressure" in var_name else 1.0
-            data *= 100.0 if "relative_humidity" in var_name else 1.0
-        if data.ndim == 1:
-            _plot_histogram(ax, data, meta)
-        elif data.ndim == 2:
-            if var_name == "lwc":
-                m_cbh = sim_data.variables["cbh"]
-            elif var_name == "lwc_pro":
-                m_cbh = sim_data.variables["cbh_pro"]
+        for method in methods:
+            color = "black" if method == "detected" else "red"
+            var_name = var_name if method == "detected" else var_name + "_pro"
+            if var_name not in sim_data.variables and meta.source in (
+                "profile",
+                "c_bnd",
+            ):
+                data = np.ma.ones((1, sim_data.dimensions["height"].size)) * np.nan
+            elif var_name not in sim_data.variables and meta.source == "1d":
+                data = np.ma.ones((1,)) * np.nan
             else:
-                m_cbh = None
-            _plot_profile(ax, data, sim_data.variables["height"][:].data, m_cbh)
+                data = sim_data.variables[var_name][:].data
+                data = np.ma.masked_equal(data, -999.0)
+                data *= 1000.0 if "lwc" in var_name else 1.0
+                data *= 100.0 if "relative_humidity" in var_name else 1.0
+            if var_name == "iwv":
+                n_prof = int(len(data))
+            if meta.source == "c_bnd":
+                _plot_cloud_boundary(
+                    ax, data, sim_data.variables["height"][:].data, color, var_name
+                )
+            else:
+                if data.ndim == 1 or "irt" in var_name:
+                    if var_name != "iwv_pro":
+                        _plot_histogram(ax, data, meta, color, var_name)
+                elif data.ndim == 2:
+                    _plot_profile(ax, data, sim_data.variables["height"][:].data, color)
 
-        _set_axis(ax, meta)
+            _set_axis(ax, meta)
 
     # Set the title for the figure
-    _set_title(axes, source, site, date_d, start_d, stop_d)
+    _set_title(axes, source, site, date_d, start_d, stop_d, n_prof)
 
     # Save the figure
     _handle_saving(site, source, date_d, start_d, stop_d, save_path, show)
@@ -108,7 +116,7 @@ def _set_axis(ax, meta: PlotMeta) -> None:
     y_label = "Height above m.s.l. (m)" if meta.source == "profile" else "Log frequency"
     if pos.x0 < 0.1:
         ax.set_ylabel(y_label)
-    elif pos.x1 > 0.1 and meta.source == "profile":
+    elif pos.x1 > 0.1:
         ax.set_yticklabels([])
     ax.set_xlabel(f"{meta.name} ({meta.xlabel})")
     ax.set_xlim(meta.plot_range)
@@ -117,7 +125,13 @@ def _set_axis(ax, meta: PlotMeta) -> None:
 
 
 def _set_title(
-    axes, source: str, site: str, date_d: str | None, start_d: str, stop_d: str
+    axes,
+    source: str,
+    site: str,
+    date_d: str | None,
+    start_d: str,
+    stop_d: str,
+    n_prof: int,
 ) -> None:
     """Set the title for the figure."""
     if source == "standard_atmosphere":
@@ -127,14 +141,16 @@ def _set_title(
         )
     else:
         axes[1].set_title(
-            f"MWRpy sim data for {site} (source: {source})\nfrom {start_d} to {stop_d}"
+            f"MWRpy sim data for {site} (source: {source})\nfrom {start_d} to {stop_d} (n={n_prof})"
             if not date_d
-            else f"MWRpy simulation data for {site} ({source})\non {date_d}",
+            else f"MWRpy simulation data for {site} ({source})\non {date_d} (n={n_prof})",
             fontsize=16,
         )
 
 
-def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
+def _plot_histogram(
+    ax, data: np.ndarray, meta: PlotMeta, color: str, var_name: str
+) -> None:
     """Plots a histogram of the data."""
     assert meta.plot_range is not None, "Plot range must be defined in PlotMeta."
     h = ax.hist(
@@ -142,45 +158,65 @@ def _plot_histogram(ax, data: np.ndarray, meta: PlotMeta) -> None:
         bins=np.linspace(meta.plot_range[0], meta.plot_range[1], 25),
         density=True,
         alpha=0.6,
-        color="black",
+        color=color,
         linewidth=1.0,
         histtype="step",
         log=True,
     )
-    ax.set_ylim([np.nanmin([np.nanmin(h[0]), 1e-1]), np.nanmax([np.nanmax(h[0]), 1e0])])
+    ax.set_ylim([1e-3, 1e1])
     ax.yaxis.set_minor_locator(plt.NullLocator())
+    y_0 = 0.85 if color == "black" else 0.75
     ax.text(
         0.1,
-        0.8,
-        f"mean: {np.ma.mean(data):.2f} {meta.xlabel}\n",
+        y_0,
+        rf"$\overline{{{var_name.replace('_pro', '_{pro}')}}}$: {str(np.round(np.ma.mean(data), 2))} {meta.xlabel}",
         transform=ax.transAxes,
         fontsize=12,
+        color=color,
     )
 
 
-def _plot_profile(
-    ax, data: np.ndarray, height: np.ndarray, m_cbh: netCDF4.Variable | None
-) -> None:
+def _plot_profile(ax, data: np.ndarray, height: np.ndarray, color: str) -> None:
     """Plots a mean profile and stdev of the data."""
     ax.fill_betweenx(
         height,
         np.ma.mean(data, axis=0) - np.ma.std(data, axis=0),
         np.ma.mean(data, axis=0) + np.ma.std(data, axis=0),
-        color="black",
+        color=color,
         alpha=0.3,
     )
     ax.plot(
         np.ma.mean(data, axis=0),
         height,
-        color="black",
+        color=color,
         linewidth=1.0,
     )
-    if m_cbh is not None:
-        ax.text(
-            0.05,
-            0.9,
-            f"mean CBH: {np.ma.mean(m_cbh[:]):.2f} m",
-            transform=ax.transAxes,
-            fontsize=12,
-            verticalalignment="top",
-        )
+
+
+def _plot_cloud_boundary(
+    ax, data: np.ma.MaskedArray, height: np.ndarray, color: str, var_name: str
+) -> None:
+    """Plots cloud boundary data."""
+    c_dat = data[(data[:, 0].mask == False) & (data[:, 0] > 0.0), 0]
+    counts, bins = np.histogram(
+        c_dat,
+        bins=height,
+    )
+    ax.stairs(
+        counts / len(c_dat) * 100.0,
+        height,
+        orientation="horizontal",
+        color=color,
+        alpha=0.6,
+    )
+
+    y_0 = 0.925 if color == "black" else 0.825
+    ax.text(
+        0.025,
+        y_0,
+        rf"$\overline{{{var_name.replace('_pro', '_{pro}')}}}$: {str(np.round(np.ma.mean(c_dat), 1))} m",
+        transform=ax.transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        color=color,
+    )

@@ -1,3 +1,24 @@
+## 1.0.0 – 2026-06-26
+
+- Merge pull request #12 from tobiasmarke/torch
+- Compute weighting function
+- Fix type
+- Implement atmoslib
+- Add GRUAN input
+- Fix Cloudnet format processing
+- Change plot variables
+- Avoid missing IR data
+- Fix stacking data
+- Fix IRT array type
+- Fix lwp type
+- Run daily files (Cloudnet format)
+- Add ERA5 input (Cloudnet format) and optional 2m fields
+- Improve IR method
+- Run radiative transfer with openMWR
+- Change altitude range for height check
+- Bug fixes
+- Adjust input height check
+
 ## 0.8.4 – 2026-01-07
 
 - Add multi-processing
