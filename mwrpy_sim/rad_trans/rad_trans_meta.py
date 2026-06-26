@@ -201,6 +201,12 @@ ATTRIBUTES_SOURCE = {
         units="m",
         dimensions=("time", "cloud_layer"),
     ),
+    "weighting_function": MetaData(
+        long_name="Weighting function derived from ",
+        standard_name="weighting_function",
+        units="m-1",
+        dimensions=("time", "frequency", "height"),
+    ),
     "k_index": MetaData(
         long_name="K-index derived from ",
         standard_name="k_index",

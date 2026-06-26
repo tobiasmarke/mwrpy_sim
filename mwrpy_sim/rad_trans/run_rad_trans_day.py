@@ -3,6 +3,7 @@ import xarray as xr
 from openMWR.cloud import CloudColumn, CloudModelConfig
 from openMWR.parallel import run_pool
 from openMWR.run_RT import _get_cloud_top_base
+from pyrtlib.weighting_functions import WeightingFunctions
 from torchMWRT import AtmProfile, RTModel
 
 from mwrpy_sim.data_tools.stability_indices import calc_stability_indices
@@ -196,6 +197,29 @@ def rad_trans_day(
             output[var] = np.ma.masked_all(
                 (len(input_dat["time"]), len(params["height"])), np.float32
             )
+
+    # Compute weighting functions
+    output["weighting_function"] = np.ma.masked_all(
+        (len(input_dat["time"]), len(params["frequency"]), len(params["height"])),
+        np.float32,
+    )
+    for wf_i in range(len(input_dat["time"])):
+        wf = WeightingFunctions(
+            input_dat["height"][:] / 1000.0,
+            input_dat["air_pressure"][wf_i, :] / 100.0,
+            input_dat["air_temperature"][wf_i, :],
+            input_dat["relative_humidity"][wf_i, :],
+        )
+        wf.frequencies = np.array(params["frequency"])
+        wf.satellite = False
+        wgf = np.ma.array(wf.generate_wf() / 1000.0)
+        output["weighting_function"][wf_i, :, :] = interpolate_2d_nearest(
+            params["frequency"][:],
+            np.arange(0.0, input_dat["height"][-1] + 1000.0, 1000),
+            wgf,
+            params["frequency"][:],
+            params["height"][:],
+        )
 
     # Calculate stability indices
     stab_dict = calc_stability_indices(output, params["height"][:])
