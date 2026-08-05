@@ -1,3 +1,9 @@
+## 1.0.1 – 2026-08-05
+
+- Merge pull request #13 from tobiasmarke/lhumpro
+- Fix standard output/plot path
+- Include support for LHUMPRO frequencies
+
 ## 1.0.0 – 2026-06-26
 
 - Merge pull request #12 from tobiasmarke/torch
