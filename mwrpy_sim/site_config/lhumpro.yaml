@@ -1,0 +1,16 @@
+# Site config file
+
+params:
+  gen: lhumpro
+  altitude: 108.
+  longitude: 6.407
+  latitude: 50.906
+
+  # path to input data and path for processed files
+  data_cn: /tmp/data/
+  data_era5: /tmp/data/
+  data_out:
+  plot_pth:
+
+global_specs:
+  title: Radiative transfer data for LHUMPRO

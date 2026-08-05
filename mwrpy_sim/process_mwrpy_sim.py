@@ -56,6 +56,11 @@ def main(args):
             logging.error(f"File {file_name} does not exist.")
         else:
             sim_data = nc.Dataset(file_name)
+            plot_pth = (
+                os.path.abspath(os.curdir) + "/tests/plots/"
+                if params["plot_pth"] is None
+                else params["plot_pth"]
+            )
             plot_sim_data(
                 sim_data,
                 args.site,
@@ -63,7 +68,7 @@ def main(args):
                 args.date,
                 args.start,
                 args.stop,
-                params["plot_pth"],
+                plot_pth,
             )
     shutil.rmtree(data_dir, ignore_errors=True)
     logging.info(f"Processing ended at {str(datetime.datetime.now()).split('.')[0]}")
@@ -251,7 +256,11 @@ def process_input(
         data_nc = call_rad_trans(input_sa, params)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]
-    data_nc["frequency"] = np.array(params["frequency"])
+    data_nc["frequency"] = (
+        np.array(params["frequency_lhumpro"])
+        if "gen" in params and (params["gen"] == "lhumpro")
+        else np.array(params["frequency"])
+    )
     data_nc["wavelength"] = np.array(params["wavelength"])
     data_nc["elevation_angle"] = np.array(params["elevation_angle"])
 
