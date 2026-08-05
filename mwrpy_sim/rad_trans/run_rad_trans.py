@@ -17,9 +17,14 @@ def rad_trans(
     """Run radiative transfer calculations for one atmospheric profile."""
     FillValue = np.nan
     config = read_config(None, "global_specs")
+    freqs = (
+        np.array(params["frequency_lhumpro"])
+        if "gen" in params and (params["gen"] == "lhumpro")
+        else np.array(params["frequency"])
+    )
     tb, tb_pro, tb_clr = (
         np.ones(
-            (len(params["frequency"]), len(np.array(params["elevation_angle"]))),
+            (len(freqs), len(np.array(params["elevation_angle"]))),
             np.float32,
         )
         * FillValue
@@ -86,7 +91,7 @@ def rad_trans(
                 lwc=lwc_tmp * 1000.0,
             )
             rtmodel = RTModel(
-                freqs=np.array(params["frequency"]),
+                freqs=freqs,
                 angles=np.array(params["elevation_angle"]),
                 absmdl=config["mw_model"],
             )
@@ -191,14 +196,14 @@ def rad_trans(
         input_dat["air_temperature"][:],
         input_dat["relative_humidity"][:],
     )
-    wf.frequencies = np.array(params["frequency"])
+    wf.frequencies = freqs
     wf.satellite = False
     wgf = np.ma.array(wf.generate_wf() / 1000.0)
     output["weighting_function"] = interpolate_2d_nearest(
-        params["frequency"][:],
+        freqs,
         np.arange(0.0, input_dat["height"][-1] + 1000.0, 1000),
         wgf,
-        params["frequency"][:],
+        freqs,
         params["height"][:],
     )
 
