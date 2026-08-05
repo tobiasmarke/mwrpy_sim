@@ -7,10 +7,10 @@ params:
   latitude: 52.208
 
   # path to input data and path for processed files
-  data_rs: /tests/data/
-  data_era5: /tests/data/
-  data_out: /tests/data/
-  plot_pth: /tests/plots/
+  data_rs: /tmp/data/
+  data_era5: /tmp/data/
+  data_out:
+  plot_pth:
 
 global_specs:
   title: Radiative transfer data for Lindenberg, Germany
