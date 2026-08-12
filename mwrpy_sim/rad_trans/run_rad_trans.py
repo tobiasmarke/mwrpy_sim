@@ -199,12 +199,17 @@ def rad_trans(
     wf.frequencies = freqs
     wf.satellite = False
     wgf = np.ma.array(wf.generate_wf() / 1000.0)
-    output["weighting_function"] = interpolate_2d_nearest(
-        freqs,
-        np.arange(0.0, input_dat["height"][-1] + 1000.0, 1000),
-        wgf,
-        freqs,
-        params["height"][:],
+    output["weighting_function"] = np.ma.masked_invalid(
+        np.expand_dims(
+            interpolate_2d_nearest(
+                freqs,
+                np.arange(0.0, input_dat["height"][-1] + 1000.0, 1000),
+                wgf,
+                freqs,
+                params["height"][:],
+            ),
+            0,
+        )
     )
 
     # Calculate stability indices

@@ -210,7 +210,11 @@ def prepare_gruan(rs_data: nc.Dataset) -> dict:
     _, ind = np.unique(height, return_index=True, equal_nan=True)
     ind = ind_s[ind]
     ind = ind[~np.isnan(rs_data["temp"][ind])]
-    if rs_data["alt_amsl"][ind[-2]] < 10000.0:
+    if (
+        (rs_data["alt_amsl"][ind[-2]] < 10000.0)
+        or (np.any(rs_data["rh"][ind] > 110.0))
+        or (np.any(np.isnan(rs_data["rh"][ind])))
+    ):
         return {}
     time = datetime.datetime.strptime(
         rs_data.__dict__["g.Measurement.StartTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -421,7 +425,7 @@ def check_height(input_dict: dict, altitude: float, tolerance: float = 5.0) -> d
     elif np.abs(delta_z) > tolerance and delta_z > -150.0:
         # Extrapolate the first part of the profile (< 1000 m)
         ind_h = input_dict["height"] - input_dict["height"][0] <= 1000.0
-        height_new = (
+        height_new = np.sort(
             input_dict["height"][ind_h]
             - delta_z
             + np.linspace(0, 1, len(input_dict["height"][ind_h])) * delta_z
@@ -490,7 +494,7 @@ def check_height_day(input_dict: dict, altitude: float, tolerance: float = 5.0) 
     elif np.all(np.abs(delta_z) > tolerance) and np.all(delta_z >= -150.0):
         # Extrapolate the first part of the profile (< 1000 m)
         ind_h = np.all(input_dict["height"] < 1000.0, axis=0)
-        height_1000 = (
+        height_1000 = np.sort(
             height_new[ind_h]
             - np.mean(delta_z)
             + np.linspace(0, 1, len(height_new[ind_h])) * np.mean(delta_z)

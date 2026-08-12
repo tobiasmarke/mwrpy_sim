@@ -40,9 +40,9 @@ def append_data(data_in: dict, output_dict: dict) -> dict:
 
 def get_file_list(path_to_files: str, key: str, ext: str = "nc") -> list[str]:
     """Returns file list for specified path."""
-    f_list = sorted(glob.glob(path_to_files + "*" + key + "*." + ext))
+    f_list = sorted(glob.glob(f"{path_to_files}*{key}*.{ext}"))
     if len(f_list) == 0:
-        logging.warning("Error: no files found in directory %s", path_to_files)
+        logging.warning(f"Warning: file {path_to_files}*{key}*.{ext} not found")
     return f_list
 
 

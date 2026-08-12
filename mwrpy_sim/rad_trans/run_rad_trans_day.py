@@ -18,11 +18,16 @@ def rad_trans_day(
     """Run radiative transfer calculations for one day of atmospheric profiles."""
     FillValue = np.nan
     config = read_config(None, "global_specs")
+    freqs = (
+        np.array(params["frequency_lhumpro"])
+        if "gen" in params and (params["gen"] == "lhumpro")
+        else np.array(params["frequency"])
+    )
     tb, tb_pro, tb_clr = (
         np.ones(
             (
                 len(input_dat["time"][:]),
-                len(params["frequency"]),
+                len(freqs),
                 len(np.array(params["elevation_angle"])),
             ),
             np.float32,
@@ -93,7 +98,7 @@ def rad_trans_day(
             lwc=lwc_tmp * 1000.0,
         )
         rtmodel = RTModel(
-            freqs=np.array(params["frequency"]),
+            freqs=freqs,
             angles=np.array(params["elevation_angle"]),
             absmdl=config["mw_model"],
         )
@@ -200,7 +205,7 @@ def rad_trans_day(
 
     # Compute weighting functions
     output["weighting_function"] = np.ma.masked_all(
-        (len(input_dat["time"]), len(params["frequency"]), len(params["height"])),
+        (len(input_dat["time"]), len(freqs), len(params["height"])),
         np.float32,
     )
     for wf_i in range(len(input_dat["time"])):
@@ -210,14 +215,14 @@ def rad_trans_day(
             input_dat["air_temperature"][wf_i, :],
             input_dat["relative_humidity"][wf_i, :],
         )
-        wf.frequencies = np.array(params["frequency"])
+        wf.frequencies = freqs
         wf.satellite = False
         wgf = np.ma.array(wf.generate_wf() / 1000.0)
         output["weighting_function"][wf_i, :, :] = interpolate_2d_nearest(
-            params["frequency"][:],
+            freqs,
             np.arange(0.0, input_dat["height"][-1] + 1000.0, 1000),
             wgf,
-            params["frequency"][:],
+            freqs,
             params["height"][:],
         )
 
