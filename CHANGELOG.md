@@ -1,3 +1,10 @@
+## 1.0.2 – 2026-08-26
+
+- Update README
+- Run standard atmosphere without config and add IR only option
+- New height levels
+- Small fixes
+
 ## 1.0.1 – 2026-08-05
 
 - Merge pull request #13 from tobiasmarke/lhumpro
