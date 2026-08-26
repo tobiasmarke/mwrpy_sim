@@ -40,9 +40,9 @@ def append_data(data_in: dict, output_dict: dict) -> dict:
 
 def get_file_list(path_to_files: str, key: str, ext: str = "nc") -> list[str]:
     """Returns file list for specified path."""
-    f_list = sorted(glob.glob(path_to_files + "*" + key + "*." + ext))
+    f_list = sorted(glob.glob(f"{path_to_files}*{key}*.{ext}"))
     if len(f_list) == 0:
-        logging.warning("Error: no files found in directory %s", path_to_files)
+        logging.warning(f"Warning: file {path_to_files}*{key}*.{ext} not found")
     return f_list
 
 
@@ -72,9 +72,9 @@ def _get_filename(
             f"{site}_{source}_{start.strftime('%Y%m%d')}_{stop.strftime('%Y%m%d')}.nc"
         )
     data_out = (
-        os.path.abspath(os.curdir) + "/tests/data/"
-        if params["data_out"] is None
-        else params["data_out"]
+        params["data_out"]
+        if "data_out" in params and params["data_out"] is not None
+        else os.path.abspath(os.curdir) + "/tests/data/"
     )
     return str(os.path.join(data_out + filename))
 
@@ -171,7 +171,7 @@ def isscalar(array: Any) -> bool:
 
 def read_config(site: str | None, key: Literal["global_specs", "params"]) -> dict:
     data = _read_config_yaml()[key]
-    if site is not None:
+    if site is not None and site != "standard_atmosphere":
         data.update(_read_site_config_yaml(site)[key])
     return data
 

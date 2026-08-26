@@ -57,9 +57,9 @@ def main(args):
         else:
             sim_data = nc.Dataset(file_name)
             plot_pth = (
-                os.path.abspath(os.curdir) + "/tests/plots/"
-                if params["plot_pth"] is None
-                else params["plot_pth"]
+                params["plot_pth"]
+                if "plot_pth" in params and params["plot_pth"] is not None
+                else os.path.abspath(os.curdir) + "/tests/plots/"
             )
             plot_sim_data(
                 sim_data,
@@ -253,6 +253,7 @@ def process_input(
     if source == "standard_atmosphere":
         logging.info(f"Radiative transfer using {source} data")
         input_sa = prep.prepare_standard_atmosphere()
+        params["altitude"] = 0.0
         data_nc = call_rad_trans(input_sa, params)
 
     data_nc["height"] = np.array(params["height"]) + params["altitude"]

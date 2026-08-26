@@ -17,7 +17,6 @@ def modify_prof_500m(
         temperature: Temperature array (K)
         pressure: Pressure array (Pa)
         dewpoint: Dewpoint temperature array (K)
-        mixing_ratio: Mixing ratio array (kg/kg)
 
     Output:
         Modified profiles.
