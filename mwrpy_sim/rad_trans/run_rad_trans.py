@@ -22,13 +22,13 @@ def rad_trans(
         if "gen" in params and (params["gen"] == "lhumpro")
         else np.array(params["frequency"])
     )
-    tb, tb_pro, tb_clr = (
+    tb, tb_pro, tb_clr, tb_tmp = (
         np.ones(
             (len(freqs), len(np.array(params["elevation_angle"]))),
             np.float32,
         )
         * FillValue
-        for _ in range(3)
+        for _ in range(4)
     )
     irt, irt_pro, irt_clr = (
         np.ones(len(params["wavelength"]), np.float32) * FillValue for _ in range(3)
@@ -82,23 +82,24 @@ def rad_trans(
         elif method == "clear" and lwp_pro == 0.0:
             tb_clr, irt_clr = np.copy(tb_pro), np.copy(irt_pro)
         else:
-            # MW radiative transport
-            atm_profile = AtmProfile(
-                temperature=input_dat["air_temperature"][:],
-                height=input_dat["height"][:],
-                pressure=input_dat["air_pressure"][:] / 100.0,
-                rh=input_dat["relative_humidity"][:],
-                lwc=lwc_tmp * 1000.0,
-            )
-            rtmodel = RTModel(
-                freqs=freqs,
-                angles=np.array(params["elevation_angle"]),
-                absmdl=config["mw_model"],
-            )
-            ds = rtmodel.execute(atm_profile, return_ds=True)
-            tb_tmp = ds["tbtotal"].values
+            if not config["ir_only"]:
+                # MW radiative transport
+                atm_profile = AtmProfile(
+                    temperature=input_dat["air_temperature"][:],
+                    height=input_dat["height"][:],
+                    pressure=input_dat["air_pressure"][:] / 100.0,
+                    rh=input_dat["relative_humidity"][:],
+                    lwc=lwc_tmp * 1000.0,
+                )
+                rtmodel = RTModel(
+                    freqs=freqs,
+                    angles=np.array(params["elevation_angle"]),
+                    absmdl=config["mw_model"],
+                )
+                ds = rtmodel.execute(atm_profile, return_ds=True)
+                tb_tmp = ds["tbtotal"].values
 
-            if config["calc_ir"]:
+            if config["calc_ir"] or config["ir_only"]:
                 ds = xr.Dataset(
                     data_vars=dict(
                         T=(["height"], input_dat["air_temperature"]),

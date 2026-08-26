@@ -72,9 +72,9 @@ def _get_filename(
             f"{site}_{source}_{start.strftime('%Y%m%d')}_{stop.strftime('%Y%m%d')}.nc"
         )
     data_out = (
-        os.path.abspath(os.curdir) + "/tests/data/"
-        if params["data_out"] is None
-        else params["data_out"]
+        params["data_out"]
+        if "data_out" in params and params["data_out"] is not None
+        else os.path.abspath(os.curdir) + "/tests/data/"
     )
     return str(os.path.join(data_out + filename))
 
@@ -171,7 +171,7 @@ def isscalar(array: Any) -> bool:
 
 def read_config(site: str | None, key: Literal["global_specs", "params"]) -> dict:
     data = _read_config_yaml()[key]
-    if site is not None:
+    if site is not None and site != "standard_atmosphere":
         data.update(_read_site_config_yaml(site)[key])
     return data
 
