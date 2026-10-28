@@ -1,3 +1,8 @@
+## 1.0.3 – 2026-10-28
+
+- Plot cloud occurrence
+- Add Cloudnet observations as input and RH threshold option to config
+
 ## 1.0.2 – 2026-08-26
 
 - Update README
