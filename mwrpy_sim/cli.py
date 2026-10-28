@@ -47,6 +47,7 @@ def _parse_args(args):
             "gruan",
             "vaisala",
             "era5",
+            "obs",
             "get_era5",
             "standard_atmosphere",
         ],

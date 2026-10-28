@@ -250,6 +250,42 @@ def process_input(
                             continue
                         data_nc = append_data(data_nc, output_hour)
 
+    elif source == "obs":
+        for date in date_range(start_date, stop_date):
+            data_cat = (
+                params["data_obs"]
+                + "categorize/"
+                + date.strftime("%Y/")
+                + date.strftime("%Y%m%d")
+            )
+            data_lwc = (
+                params["data_obs"]
+                + "lwc-scaled-adiabatic/"
+                + date.strftime("%Y/")
+                + date.strftime("%Y%m%d")
+            )
+            file_cat = get_file_list(data_cat, "categorize")
+            file_lwc = get_file_list(data_lwc, "lwc-scaled-adiabatic")
+            if len(file_cat) == 1 and len(file_lwc) == 1:
+                with (
+                    nc.Dataset(file_cat[0]) as obs_cat,
+                    nc.Dataset(file_lwc[0]) as obs_lwc,
+                ):
+                    logging.info(
+                        f"Radiative transfer using {source} data "
+                        f"for {site}, {date.strftime('%Y%m%d')}"
+                    )
+                    input_obs = prep.prepare_obs(
+                        obs_cat, obs_lwc, date.strftime("%Y%m%d%H%M")
+                    )
+                    input_obs = prep.check_height_day(input_obs, params["altitude"])
+                    try:
+                        output_hour = rad_trans_day(input_obs, params)
+                    except ValueError:
+                        logging.info(f"Skipping file {file_cat[0]} and {file_lwc[0]}")
+                        continue
+                    data_nc = append_data(data_nc, output_hour)
+
     if source == "standard_atmosphere":
         logging.info(f"Radiative transfer using {source} data")
         input_sa = prep.prepare_standard_atmosphere()

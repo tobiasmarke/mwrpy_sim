@@ -72,6 +72,7 @@ def rad_trans_day(
                     input_dat["relative_humidity"][itx, :],
                     CloudModelConfig(
                         karstens=True,
+                        rh_thres=config["rh_thres"],
                     ),
                 )
                 if method == "prognostic":

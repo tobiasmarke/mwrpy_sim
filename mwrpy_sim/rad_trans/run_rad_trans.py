@@ -59,6 +59,7 @@ def rad_trans(
                 input_dat["relative_humidity"][:],
                 CloudModelConfig(
                     karstens=True,
+                    rh_thres=config["rh_thres"],
                 ),
             )
             if method == "prognostic":

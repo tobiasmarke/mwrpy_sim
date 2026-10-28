@@ -25,6 +25,7 @@ def get_data_attributes(sim_variables: dict, source: str) -> dict:
         "gruan",
         "vaisala",
         "era5",
+        "obs",
         "standard_atmosphere",
     ):
         raise RuntimeError([source + " not supported for file writing."])

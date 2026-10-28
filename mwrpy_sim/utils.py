@@ -9,7 +9,7 @@ from typing import Any, Iterator, Literal, NamedTuple
 import numpy as np
 import yaml
 from numpy import ma
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator
 from yaml.loader import SafeLoader
 
 Epoch = tuple[int, int, int]
@@ -265,3 +265,30 @@ def interpolate_2d_nearest(
     xx, yy = np.meshgrid(x_new, y_new)
     zz = fun((xx, yy)).T
     return np.ma.masked_where(np.isnan(zz), zz)
+
+
+def interpolate_2d(
+    x: np.ndarray,
+    y: np.ndarray,
+    z: ma.MaskedArray,
+    x_new: np.ndarray,
+    y_new: np.ndarray,
+) -> ma.MaskedArray:
+    """Linear interpolation of gridded 2d data.
+
+    Args:
+        x: 1-D array.
+        y: 1-D array.
+        z: 2-D array at points (x, y).
+        x_new: 1-D array.
+        y_new: 1-D array.
+
+    Returns:
+        Interpolated data.
+
+    Notes:
+        Does not work with nans. Ignores mask of masked data. Does not extrapolate.
+
+    """
+    fun = RectBivariateSpline(x, y, z, kx=1, ky=1)
+    return fun(x_new, y_new)
