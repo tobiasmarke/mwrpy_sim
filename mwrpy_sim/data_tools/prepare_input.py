@@ -10,7 +10,7 @@ import pandas as pd
 from atmoslib import constants as con
 from scipy.interpolate import CubicSpline
 
-from mwrpy_sim.utils import seconds_since_epoch
+from mwrpy_sim.utils import interpolate_2d, seconds_since_epoch
 
 
 def prepare_cn(
@@ -32,6 +32,10 @@ def prepare_cn(
     input_cn["lwc_in"] = cn_data["ql"][:-1, :] * atmoslib.air_density(
         input_cn["air_temperature"], input_cn["air_pressure"], mr
     )
+    if "qr" in cn_data.variables:
+        input_cn["lwc_in"] += cn_data["qr"][:-1, :] * atmoslib.air_density(
+            input_cn["air_temperature"], input_cn["air_pressure"], mr
+        )
     if add_2m:
         input_cn = _add_2m_fields(cn_data, input_cn, hasl)
     input_cn["time"] = np.array(
@@ -264,6 +268,46 @@ def prepare_vaisala(vs_data: nc.Dataset, altitude: float = 0.0) -> dict:
     }
 
     return _add_std_atm(input_vs, 50.0)
+
+
+def prepare_obs(cat_data: nc.Dataset, lwc_data: nc.Dataset, date: str) -> dict:
+    """Prepare input data from Cloudnet observations."""
+    lwc = lwc_data.variables["lwc"][:].astype(np.float64)
+    lwc[lwc.mask] = 0.0
+    ind_mod = np.any(np.isfinite(cat_data.variables["temperature"][:, :]), axis=1) & (
+        cat_data["model_time"][:] < 24
+    )
+    ind_mod = ind_mod.mask == False if np.ma.is_masked(ind_mod) else ind_mod
+    input_obs = {
+        "height": np.resize(
+            cat_data.variables["model_height"][:].astype(np.float64),
+            (
+                len(cat_data.variables["model_time"][ind_mod]),
+                len(cat_data.variables["model_height"][:]),
+            ),
+        ),
+        "air_temperature": cat_data.variables["temperature"][ind_mod, :],
+        "air_pressure": cat_data.variables["pressure"][ind_mod, :],
+        "relative_humidity": atmoslib.relative_humidity(
+            cat_data.variables["temperature"][ind_mod, :],
+            cat_data.variables["pressure"][ind_mod, :],
+            cat_data.variables["q"][ind_mod, :],
+        ),
+        "lwc_in": (
+            interpolate_2d(
+                lwc_data.variables["time"][:],
+                lwc_data.variables["height"][:],
+                lwc,
+                cat_data.variables["model_time"][ind_mod],
+                cat_data.variables["model_height"][:],
+            )
+        ),
+        "time": np.array(
+            seconds_since_epoch(date) + cat_data["model_time"][ind_mod] * 3600.0
+        ),
+    }
+
+    return _add_std_atm(input_obs, h_val=90.0)
 
 
 def prepare_standard_atmosphere(prof: int = 5) -> dict:

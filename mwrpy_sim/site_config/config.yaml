@@ -21,7 +21,7 @@ params:
     ]
   frequency_lhumpro:
     [
-      90.00,
+      89.00,
       183.91,
       184.81,
       185.81,
@@ -135,6 +135,7 @@ params:
 global_specs:
   mw_model: R24
   clouds: True
+  rh_thres: 0.97
   calc_ir: False
   ir_only: False
   era5: cloudnet
