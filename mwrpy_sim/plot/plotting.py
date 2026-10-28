@@ -25,14 +25,18 @@ def plot_sim_data(
     :param sim_data: Dataset containing simulation data.
     :param site: Name of site.
     :param source: Name of the data source.
+    :param date_d: Date string for a single day (YYYY-MM-DD) or None.
+    :param start_d: Start date string (YYYY-MM-DD).
+    :param stop_d: Stop date string (YYYY-MM-DD).
+    :param save_path: Path to save the plot.
     :param dpi: Dots per inch for the plot resolution.
     :param show: If True, display the plot interactively.
     :return:
     """
     fig, axes = _initialize_figure(3, 3, dpi)
-    methods = ("detected", "prognostic")
-    for ax, (var_name, meta) in zip(axes, ATTRIBUTES.items()):
-        for method in methods:
+    methods, n_prof = ("detected", "prognostic"), None
+    for method in methods:
+        for ax, (var_name, meta) in zip(axes, ATTRIBUTES.items()):
             color = "black" if method == "detected" else "red"
             var_name = var_name if method == "detected" else var_name + "_pro"
             if var_name not in sim_data.variables and meta.source in (
@@ -47,18 +51,18 @@ def plot_sim_data(
                 data = np.ma.masked_equal(data, -999.0)
                 data *= 1000.0 if "lwc" in var_name else 1.0
                 data *= 100.0 if "relative_humidity" in var_name else 1.0
-            if var_name == "iwv":
-                n_prof = int(len(data))
+            n_prof = int(len(data)) if var_name == "iwv" and n_prof is None else n_prof
             if meta.source == "c_bnd":
                 _plot_cloud_boundary(
                     ax, data, sim_data.variables["height"][:].data, color, var_name
                 )
             else:
-                if data.ndim == 1 or "irt" in var_name:
-                    if var_name != "iwv_pro":
-                        _plot_histogram(ax, data, meta, color, var_name)
+                if (data.ndim == 1 or "irt" in var_name) and var_name != "iwv_pro":
+                    _plot_histogram(ax, data, meta, color, var_name)
                 elif data.ndim == 2:
                     _plot_profile(ax, data, sim_data.variables["height"][:].data, color)
+                    if "lwc" in var_name:
+                        _cloud_occurrence_percentage(ax, data, color)
 
             _set_axis(ax, meta)
 
@@ -89,7 +93,7 @@ def _handle_saving(
     date_d: str | None,
     start_d: str,
     stop_d: str,
-    save_path,
+    save_path: str,
     show: bool,
 ) -> None:
     """Saves plot."""
@@ -102,7 +106,7 @@ def _handle_saving(
             else f"mwrpy_sim_{site}_{source}_{start_d}_{stop_d}.png"
         )
     plt.savefig(
-        str(os.path.join(save_path + filename)),
+        str(os.path.join(save_path, filename)),
         bbox_inches="tight",
     )
     if show:
@@ -120,7 +124,7 @@ def _set_axis(ax, meta: PlotMeta) -> None:
         ax.set_yticklabels([])
     ax.set_xlabel(f"{meta.name} ({meta.xlabel})")
     ax.set_xlim(meta.plot_range)
-    if meta.source == "profile":
+    if meta.source in ("profile", "c_bnd"):
         ax.set_ylim(0, 10000)
 
 
@@ -131,7 +135,7 @@ def _set_title(
     date_d: str | None,
     start_d: str,
     stop_d: str,
-    n_prof: int,
+    n_prof: int | None,
 ) -> None:
     """Set the title for the figure."""
     if source == "standard_atmosphere":
@@ -153,7 +157,7 @@ def _plot_histogram(
 ) -> None:
     """Plots a histogram of the data."""
     assert meta.plot_range is not None, "Plot range must be defined in PlotMeta."
-    h = ax.hist(
+    ax.hist(
         data,
         bins=np.linspace(meta.plot_range[0], meta.plot_range[1], 25),
         density=True,
@@ -167,7 +171,7 @@ def _plot_histogram(
     ax.yaxis.set_minor_locator(plt.NullLocator())
     y_0 = 0.85 if color == "black" else 0.75
     ax.text(
-        0.1,
+        0.3,
         y_0,
         rf"$\overline{{{var_name.replace('_pro', '_{pro}')}}}$: {str(np.round(np.ma.mean(data), 2))} {meta.xlabel}",
         transform=ax.transAxes,
@@ -212,9 +216,26 @@ def _plot_cloud_boundary(
 
     y_0 = 0.925 if color == "black" else 0.825
     ax.text(
-        0.025,
+        0.3,
         y_0,
         rf"$\overline{{{var_name.replace('_pro', '_{pro}')}}}$: {str(np.round(np.ma.mean(c_dat), 1))} m",
+        transform=ax.transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        color=color,
+    )
+
+
+def _cloud_occurrence_percentage(ax, data: np.ma.MaskedArray, color: str) -> None:
+    """Calculates and displays the cloud occurrence percentage from liquid water profiles."""
+    c_dat = data[np.any(data[:, :] > 0.0, axis=1), 0]
+    prc = (len(c_dat) / len(data)) * 100.0 if len(data) > 0 else None
+
+    y_0 = 0.925 if color == "black" else 0.825
+    ax.text(
+        0.3,
+        y_0,
+        f"cloudy: {str(np.round(prc, 1))} %" if prc is not None else "cloudy: -- %",
         transform=ax.transAxes,
         fontsize=12,
         verticalalignment="top",

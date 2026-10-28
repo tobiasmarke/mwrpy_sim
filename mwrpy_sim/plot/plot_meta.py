@@ -48,13 +48,13 @@ ATTRIBUTES = {
     "cbh": PlotMeta(
         name="Cloud base height occurrence",
         xlabel=_PP,
-        plot_range=(0.0, 10.0),
+        plot_range=(0.0, 6.0),
         source="c_bnd",
     ),
     "cth": PlotMeta(
         name="Cloud top height occurrence",
         xlabel=_PP,
-        plot_range=(0.0, 10.0),
+        plot_range=(0.0, 6.0),
         source="c_bnd",
     ),
     "relative_humidity": PlotMeta(
